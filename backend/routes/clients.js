@@ -184,6 +184,21 @@ router.post('/', checkPermission('CLIENTS', 'can_create'), uploader.single('Chem
 
         const clientId = result.insertId;
 
+        // Move the uploaded file if present
+        let finalCheminLettreEXO = cheminLettreEXO;
+        if (req.file) {
+            const clientNameSafe = (NomRS || 'unknown').replace(/[^a-zA-Z0-9]/g, '_');
+            const dynamicOutputDir = path.join(__dirname, '..', 'uploads', 'clients', `${clientId}_${clientNameSafe}`);
+            if (!fs.existsSync(dynamicOutputDir)) {
+                fs.mkdirSync(dynamicOutputDir, { recursive: true });
+            }
+            const newPath = path.join(dynamicOutputDir, req.file.filename);
+            fs.renameSync(req.file.path, newPath);
+            finalCheminLettreEXO = `/uploads/clients/${clientId}_${clientNameSafe}/${req.file.filename}`;
+
+            await connection.query('UPDATE CLIENTS SET CheminLettreEXO = ? WHERE IDCLIENTS = ?', [finalCheminLettreEXO, clientId]);
+        }
+
         // Create Account (ComptesClients)
         await connection.query(
             `INSERT INTO ComptesClients (
@@ -278,6 +293,17 @@ router.put('/:id', checkPermission('CLIENTS', 'can_edit'), uploader.single('Chem
             }
         }
 
+        if (req.file) {
+            const clientNameSafe = (NomRS || 'unknown').replace(/[^a-zA-Z0-9]/g, '_');
+            const dynamicOutputDir = path.join(__dirname, '..', 'uploads', 'clients', `${clientId}_${clientNameSafe}`);
+            if (!fs.existsSync(dynamicOutputDir)) {
+                fs.mkdirSync(dynamicOutputDir, { recursive: true });
+            }
+            const newPath = path.join(dynamicOutputDir, req.file.filename);
+            fs.renameSync(req.file.path, newPath);
+            cheminLettreEXO = `/uploads/clients/${clientId}_${clientNameSafe}/${req.file.filename}`;
+        }
+
         // Update Client
         let updateQuery = `UPDATE CLIENTS SET 
             NomRS=?, adresseClient=?, TelClient=?, CelClient=?, EmailClient=?,
@@ -330,6 +356,100 @@ router.put('/:id', checkPermission('CLIENTS', 'can_edit'), uploader.single('Chem
         }
         console.error('Error updating client:', error);
         res.status(400).json({ error: error.message });
+    } finally {
+        connection.release();
+    }
+});
+
+/**
+ * PATCH /api/clients/:id/email
+ * Quick update of client email address
+ */
+router.patch('/:id/email', checkPermission('CLIENTS', 'can_edit'), async (req, res) => {
+    try {
+        const { email } = req.body;
+        const clientId = req.params.id;
+
+        if (!email) {
+            return res.status(400).json({ error: 'Email is required' });
+        }
+
+        const [result] = await pool.query(
+            'UPDATE CLIENTS SET EmailClient = ?, Modifiele = NOW(), idagentmodification = ? WHERE IDCLIENTS = ?',
+            [email, req.user.id, clientId]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Client not found' });
+        }
+
+        await auditService.log({
+            agent_id: req.user.id,
+            structur_id: req.user.structur_id,
+            action: 'UPDATE',
+            resource_type: 'CLIENT',
+            resource_id: clientId,
+            details: { field: 'EmailClient', new_value: email },
+            ip_address: req.ip,
+            user_agent: req.headers['user-agent']
+        });
+
+        res.json({ message: 'Email mis à jour avec succès' });
+    } catch (error) {
+        console.error('Error updating client email:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+/**
+ * DELETE /api/clients/:id
+ * Delete a client
+ */
+router.delete('/:id', checkPermission('CLIENTS', 'can_delete'), async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+        const clientId = req.params.id;
+
+        await connection.beginTransaction();
+
+        // Check if client has associated dossiers
+        const [dossiers] = await connection.query(
+            'SELECT IDDossiers FROM dossiers WHERE IDCLIENTS = ? LIMIT 1',
+            [clientId]
+        );
+
+        if (dossiers.length > 0) {
+            return res.status(400).json({
+                error: 'Impossible de supprimer ce client car il possède des dossiers associés.'
+            });
+        }
+
+        const [result] = await connection.query(
+            'DELETE FROM CLIENTS WHERE IDCLIENTS = ?',
+            [clientId]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Client introuvable' });
+        }
+
+        await auditService.log({
+            agent_id: req.user.id,
+            structur_id: req.user.structur_id,
+            action: 'DELETE',
+            resource_type: 'CLIENT',
+            resource_id: clientId,
+            details: { message: 'Client deleted' },
+            ip_address: req.ip,
+            user_agent: req.headers['user-agent']
+        });
+
+        await connection.commit();
+        res.json({ message: 'Client supprimé avec succès' });
+    } catch (error) {
+        await connection.rollback();
+        console.error('Error deleting client:', error);
+        res.status(500).json({ error: 'Erreur lors de la suppression' });
     } finally {
         connection.release();
     }

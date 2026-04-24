@@ -19,7 +19,7 @@ router.get('/', checkPermission('TAXES', 'can_view'), async (req, res) => {
                 SELECT DISTINCT t.*, tx.Taux
                 FROM taxes t
                 INNER JOIN tarifs tr ON t.CodeTaxe = tr.CodeTaxe
-                LEFT JOIN taux tx ON tr.IDTaux = tx.IDTaux
+                LEFT JOIN taux tx ON tr.CodeTaux = tx.CodeTaux
                 WHERE tr.NTS = ?
             `;
             params.push(nts);
@@ -35,4 +35,43 @@ router.get('/', checkPermission('TAXES', 'can_view'), async (req, res) => {
     }
 });
 
+// POST /api/taxes - Create a new taxe
+router.post('/', checkPermission('TAXES', 'can_create'), async (req, res) => {
+    try {
+        const { CodeTaxe, LibelleTaxe, LibelleTaxeComplet, Base, Niveau } = req.body;
+        if (!CodeTaxe || !LibelleTaxe) {
+            return res.status(400).json({ error: 'CodeTaxe et LibelleTaxe sont obligatoires' });
+        }
+
+        const [existing] = await pool.query('SELECT IDTaxes FROM taxes WHERE CodeTaxe = ?', [CodeTaxe]);
+        if (existing.length > 0) {
+            return res.status(409).json({ error: `Le code taxe ${CodeTaxe} existe déjà` });
+        }
+
+        const [result] = await pool.query(
+            'INSERT INTO taxes (CodeTaxe, LibelleTaxe, LibelleTaxeComplet, Base, Niveau, IdAgent) VALUES (?, ?, ?, ?, ?, ?)',
+            [CodeTaxe, LibelleTaxe, LibelleTaxeComplet || '', Base || '', Niveau || 1, req.user.id]
+        );
+        res.status(201).json({ message: 'Taxe créée avec succès', id: result.insertId, CodeTaxe });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// DELETE /api/taxes/:id - Delete a taxe
+router.delete('/:id', checkPermission('TAXES', 'can_delete'), async (req, res) => {
+    try {
+        const [result] = await pool.query('DELETE FROM taxes WHERE IDTaxes = ?', [req.params.id]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Taxe introuvable' });
+        }
+        res.json({ message: 'Taxe supprimée avec succès' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 module.exports = router;
+

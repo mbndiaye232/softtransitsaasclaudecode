@@ -1,78 +1,102 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { dossiersAPI, clientsAPI, authAPI } from '../services/api';
+import { dossiersAPI, clientsAPI, authAPI, documentsAPI } from '../services/api';
 import CotationManager from '../components/dossiers/CotationManager';
 import OrdreTransitManager from '../components/dossiers/OrdreTransitManager';
+import TransportManager from '../components/dossiers/TransportManager';
+import TitreTransportManager from '../components/dossiers/TitreTransportManager';
+import CompositionTransportManager from '../components/dossiers/CompositionTransportManager';
+import OrdreTransportManager from '../components/dossiers/OrdreTransportManager';
+import DeclarationManager from '../components/dossiers/DeclarationManager';
+import MiseEnLivraisonManager from '../components/dossiers/MiseEnLivraisonManager';
+import BordereauLivraisonManager from '../components/dossiers/BordereauLivraisonManager';
+import FacturationManager from '../components/dossiers/FacturationManager';
+import DevisManager from '../components/dossiers/DevisManager';
+import FacturesTiersManager from '../components/dossiers/FacturesTiersManager';
 import {
-    Save,
-    X,
-    Link as LinkIcon,
-    FileText,
-    User,
-    Phone,
-    Mail,
-    Info,
-    Settings,
-    CheckCircle,
-    Building2,
-    Briefcase,
-    FileSearch,
-    ChevronLeft,
-    Shield
+    Save, X, Link as LinkIcon, FileText, User, Phone, Mail, Info,
+    Settings, CheckCircle, Building2, Briefcase, FileSearch,
+    ChevronLeft, Shield, Package, Truck, CreditCard, FileCheck2,
+    Eye, Ship, Plane, Hash, Calendar, ArrowLeft
 } from 'lucide-react';
+
+/* ─── Mode config (same as DossierList) ─────────────────────────────────── */
+const MODE_CONFIG = {
+    MA: { label: 'Maritime', icon: <Ship size={13} />,  bg: '#dbeafe', color: '#1d4ed8', grad: '#1e40af' },
+    AE: { label: 'Aérien',   icon: <Plane size={13} />, bg: '#ede9fe', color: '#7c3aed', grad: '#5b21b6' },
+    TE: { label: 'Routier',  icon: <Truck size={13} />, bg: '#ffedd5', color: '#c2410c', grad: '#9a3412' },
+}
+const modeConf = (m) => MODE_CONFIG[m] || { label: m || '—', icon: <FileText size={13} />, bg: '#f3f4f6', color: '#6b7280', grad: '#374151' }
+
+const NATURE_LABELS = { IMP: 'Importation', EXP: 'Exportation' }
+const TYPE_LABELS   = { TC: 'Conteneur', GR: 'Groupage', CO: 'Conventionnel' }
+
+/* ─── MetaBadge ─────────────────────────────────────────────────────────── */
+const MetaBadge = ({ icon, label, color = '#fff', opacity = 0.8 }) => (
+    <div style={{
+        display: 'flex', alignItems: 'center', gap: '6px',
+        background: 'rgba(255,255,255,.12)', backdropFilter: 'blur(6px)',
+        borderRadius: '99px', padding: '5px 12px',
+        fontSize: '12px', fontWeight: 700, color,
+        border: '1px solid rgba(255,255,255,.18)',
+    }}>
+        <span style={{ opacity }}>{icon}</span>
+        <span style={{ opacity }}>{label}</span>
+    </div>
+)
 
 const DossierEdit = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const [loading, setLoading] = useState(true);
-    const [clients, setClients] = useState([]);
+    const [loading, setLoading]       = useState(true);
+    const [clients, setClients]       = useState([]);
     const [currentUser, setCurrentUser] = useState(null);
     const [dossierInfo, setDossierInfo] = useState(null);
+    const [documents, setDocuments]   = useState([]);
+    const [saving, setSaving]         = useState(false);
 
     const [form, setForm] = useState({
-        label: '',
-        nature: 'IMP',
-        mode: 'MA',
-        type: 'TC',
-        description: '',
-        contactId: '',
-        isFacturable: false,
-        dpiNumber: '',
-        quotationStep: false,
-        contactName: '',
-        contactPhone: '',
-        contactEmail: '',
-        observations: '',
-        clientId: ''
+        label: '', nature: 'IMP', mode: 'MA', type: 'TC',
+        description: '', contactId: '', isFacturable: false, dpiNumber: '',
+        quotationStep: false, contactName: '', contactPhone: '',
+        contactEmail: '', observations: '', clientId: '', dateRemiseDocs: ''
     });
 
     const [editCode, setEditCode] = useState(false);
-    const [file, setFile] = useState(null);
-    const [error, setError] = useState(null);
+    const [file, setFile]         = useState(null);
+    const [error, setError]       = useState(null);
     const [activeTab, setActiveTab] = useState('detail');
 
     const tabs = [
-        { id: 'detail', label: 'Détails du Dossier', icon: <Info size={18} /> },
-        { id: 'cotation', label: 'Cotation / Agent', icon: <User size={18} /> },
-        { id: 'ot', label: 'Ordre de Transit', icon: <FileText size={18} /> },
-        { id: 'transport', label: 'Titre de Transport', icon: <LinkIcon size={18} />, disabled: true },
-        { id: 'declaration', label: 'Déclaration', icon: <Shield size={18} />, disabled: true }
+        { id: 'detail',             label: 'Détails',        icon: <Info size={13} /> },
+        { id: 'cotation',           label: 'Cotation',       icon: <Briefcase size={13} /> },
+        { id: 'ot',                 label: 'OT (Transit)',   icon: <FileText size={13} /> },
+        { id: 'titre_transport',    label: 'TT (Titre)',     icon: <FileText size={13} /> },
+        { id: 'transport',          label: 'Transports',     icon: <LinkIcon size={13} /> },
+        { id: 'composition',        label: 'Composition',    icon: <Package size={13} /> },
+        { id: 'declaration',        label: 'Déclaration',    icon: <Shield size={13} /> },
+        { id: 'mise_livraison',     label: 'Mise en Liv.',   icon: <Truck size={13} /> },
+        { id: 'ordre-transport',    label: 'OTR (Transp.)',  icon: <Truck size={13} /> },
+        { id: 'bordereau_livraison',label: 'BL (Bordereau)', icon: <FileText size={13} /> },
+        { id: 'devis',              label: 'Devis',          icon: <FileCheck2 size={13} /> },
+        { id: 'factures_tiers',     label: 'Factures Tiers', icon: <Building2 size={13} /> },
+        { id: 'facturation',        label: 'Facturation',    icon: <CreditCard size={13} /> },
     ];
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [dossierRes, clientsRes, userRes] = await Promise.all([
+                const [dossierRes, clientsRes, userRes, docsRes] = await Promise.all([
                     dossiersAPI.getOne(id),
                     clientsAPI.getAll(),
-                    authAPI.getMe()
+                    authAPI.getMe(),
+                    documentsAPI.getByDossier(id).catch(() => ({ data: [] }))
                 ]);
-
                 const data = dossierRes.data;
                 setDossierInfo(data);
                 setClients(clientsRes.data);
                 setCurrentUser(userRes.data);
-
+                setDocuments(docsRes.data || []);
                 setForm({
                     label: data.label,
                     nature: data.nature,
@@ -87,7 +111,8 @@ const DossierEdit = () => {
                     contactPhone: data.contactPhone || '',
                     contactEmail: data.contactEmail || '',
                     observations: data.observations || '',
-                    clientId: data.clientId || ''
+                    clientId: data.clientId || '',
+                    dateRemiseDocs: data.dateRemiseDocs ? data.dateRemiseDocs.split('T')[0] : ''
                 });
             } catch (err) {
                 console.error('Fetch data error:', err);
@@ -101,354 +126,416 @@ const DossierEdit = () => {
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
-        setForm((prev) => ({
-            ...prev,
-            [name]: type === 'checkbox' ? checked : value
-        }));
-    };
-
-    const handleFileChange = (e) => {
-        setFile(e.target.files[0]);
+        setForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError(null);
+        setSaving(true);
         try {
             const formData = new FormData();
-            Object.keys(form).forEach(key => {
-                formData.append(key, form[key]);
-            });
+            Object.keys(form).forEach(key => formData.append(key, form[key]));
             formData.append('editCode', editCode);
-
-            if (file) {
-                formData.append('file', file);
-            }
-
+            if (file) formData.append('file', file);
             await dossiersAPI.update(id, formData);
             navigate('/dossiers');
         } catch (err) {
-            console.error('Update dossier error:', err);
             setError(err.response?.data?.error || 'Échec de la mise à jour');
+        } finally {
+            setSaving(false);
         }
     };
 
+    /* ── Loading ── */
     if (loading) return (
-        <div className="view-loading">
-            <div className="spinner"></div>
-            <style>{`
-                .view-loading { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: var(--bg); }
-                .spinner { width: 40px; height: 40px; border: 3px solid var(--slate-200); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
-                @keyframes spin { to { transform: rotate(360deg); } }
-            `}</style>
+        <div style={{ display:'flex', justifyContent:'center', alignItems:'center', minHeight:'100vh', background:'#fffbeb' }}>
+            <div style={{ textAlign:'center' }}>
+                <div style={{ width:44, height:44, border:'3px solid #fde68a', borderTopColor:'#f59e0b', borderRadius:'50%', animation:'spin .8s linear infinite', margin:'0 auto 12px' }} />
+                <div style={{ fontSize:14, color:'#92400e', fontWeight:600 }}>Chargement du dossier…</div>
+            </div>
+            <style>{`@keyframes spin { to { transform:rotate(360deg) } }`}</style>
         </div>
     );
 
-    const clientName = clients.find(c => c.IDClients === form.clientId)?.NomClient || 'Client inconnu';
+    const clientName = clients.find(c => c.IDCLIENTS === form.clientId)?.NomClient
+        || dossierInfo?.clientName || dossierInfo?.NomClient || 'Client inconnu';
+    const mc = modeConf(form.mode);
 
     return (
-        <div className="edit-wrapper">
-            <style>{`
-                .edit-wrapper { min-height: 100vh; background: var(--bg); padding: 2.5rem; }
-                .edit-container { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 2rem; }
-                
-                .edit-header { display: flex; justify-content: space-between; align-items: center; }
-                .back-link { display: flex; align-items: center; gap: 0.5rem; color: var(--slate-500); text-decoration: none; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
-                .back-link:hover { color: var(--primary); }
-                
-                .header-title-box h1 { font-size: 1.5rem; font-weight: 800; color: var(--slate-900); margin: 0.5rem 0 0 0; }
-                
-                /* Tab System */
-                .tab-bar { display: flex; gap: 0.5rem; background: white; padding: 0.5rem; border-radius: 1rem; border: 1px solid var(--border); margin-bottom: 1rem; position: sticky; top: 1rem; z-index: 10; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-                .tab-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1.25rem; border-radius: 0.75rem; font-size: 0.875rem; font-weight: 700; color: var(--slate-500); cursor: pointer; transition: all 0.2s; border: none; background: transparent; }
-                .tab-item:hover:not(.disabled) { background: var(--slate-50); color: var(--slate-900); }
-                .tab-item.active { background: var(--primary); color: white; box-shadow: 0 4px 12px color-mix(in srgb, var(--primary), transparent 70%); }
-                .tab-item.disabled { opacity: 0.5; cursor: not-allowed; }
+        <div style={{ minHeight:'100vh', background:'#fffbeb', fontFamily:'inherit' }}>
 
-                .form-main { background: white; border-radius: var(--radius-xl); border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; }
-                .client-strip { padding: 1.25rem 2rem; background: var(--primary-light); border-bottom: 1px solid color-mix(in srgb, var(--primary), transparent 90%); display: flex; align-items: center; gap: 1rem; }
-                .client-strip h2 { font-size: 0.875rem; font-weight: 800; color: var(--primary); margin: 0; text-transform: uppercase; letter-spacing: 0.05em; }
-                
-                .form-content { padding: 2.5rem 3rem; }
-                .form-section { margin-bottom: 3rem; }
-                .form-section:last-child { margin-bottom: 0; }
-                .section-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--slate-100); }
-                .section-title { font-size: 0.75rem; font-weight: 800; color: var(--slate-400); text-transform: uppercase; letter-spacing: 0.1em; }
-                
-                .grid-form { display: grid; grid-template-columns: repeat(12, 1fr); gap: 1.5rem; }
-                .col-2 { grid-column: span 2; }
-                .col-3 { grid-column: span 3; }
-                .col-4 { grid-column: span 4; }
-                .col-6 { grid-column: span 6; }
-                .col-12 { grid-column: span 12; }
-                @media (max-width: 768px) { .col-2, .col-3, .col-4, .col-6 { grid-column: span 12; } }
-                
-                .input-group { display: flex; flex-direction: column; gap: 0.5rem; }
-                .input-label { font-size: 0.75rem; font-weight: 700; color: var(--slate-600); }
-                .premium-input, .premium-select, .premium-textarea { 
-                    width: 100%; 
-                    padding: 0.75rem 1rem; 
-                    border: 1px solid var(--border); 
-                    border-radius: var(--radius-md); 
-                    font-size: 0.875rem; 
-                    outline: none; 
-                    background: var(--slate-50); 
-                    transition: all 0.2s; 
-                }
-                .premium-input:focus, .premium-select:focus, .premium-textarea:focus { 
-                    border-color: var(--primary); 
-                    background: white; 
-                    box-shadow: 0 0 0 4px var(--primary-light); 
-                }
-                .premium-input:read-only { background: #f1f5f9; color: var(--slate-400); border-style: dashed; }
-                
-                .input-with-actions { display: flex; gap: 0.5rem; }
-                .mini-btn { padding: 0.5rem; background: var(--slate-100); border: none; border-radius: 0.5rem; cursor: pointer; color: var(--slate-500); }
-                .mini-btn:hover { background: var(--slate-200); color: var(--slate-900); }
-                .mini-btn.active { background: var(--primary); color: white; }
-                
-                .checkbox-card { 
-                    background: #f8fafc; 
-                    padding: 1.25rem; 
-                    border-radius: var(--radius-md); 
-                    border: 1px solid var(--border); 
-                    display: flex; 
-                    align-items: center; 
-                    gap: 1rem; 
-                    cursor: pointer; 
-                    transition: all 0.2s; 
-                }
-                .checkbox-card:hover { border-color: var(--primary); background: var(--primary-light); }
-                .checkbox-card input { width: 1.25rem; height: 1.25rem; accent-color: var(--primary); }
-                .checkbox-label { font-size: 0.875rem; font-weight: 700; color: var(--slate-900); }
-                
-                .footer-actions { padding: 1.5rem 3rem; background: var(--surface-header); border-top: 1px solid var(--border-light); display: flex; justify-content: flex-end; gap: 1rem; }
-                .btn { padding: 0.75rem 2rem; border-radius: var(--radius-md); font-weight: 700; font-size: 0.875rem; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s; }
-                .btn-secondary { background: white; color: var(--slate-600); border: 1px solid var(--border); }
-                .btn-secondary:hover { background: var(--slate-50); border-color: var(--slate-300); }
-                .btn-primary { background: var(--primary); color: white; box-shadow: var(--shadow); }
-                .btn-primary:hover { background: var(--primary-hover); transform: translateY(-2px); }
-            `}</style>
+            {/* ── Hero Banner ────────────────────────────────────────────── */}
+            <div style={{
+                background: 'linear-gradient(135deg, #78350f 0%, #b45309 50%, #f59e0b 100%)',
+                padding: '28px 40px 70px',
+                position: 'relative', overflow: 'hidden',
+            }}>
+                {/* decorative circles */}
+                <div style={{ position:'absolute', top:-60, right:-60, width:220, height:220, background:'rgba(255,255,255,.06)', borderRadius:'50%' }} />
+                <div style={{ position:'absolute', bottom:-40, right:140, width:120, height:120, background:'rgba(255,255,255,.04)', borderRadius:'50%' }} />
 
-            <div className="edit-container">
-                <header className="edit-header">
-                    <div className="header-title-box">
-                        <div className="back-link" onClick={() => navigate('/dossiers')}>
-                            <ChevronLeft size={16} />
-                            Retour à la liste
+                {/* back link */}
+                <button
+                    onClick={() => navigate('/dossiers')}
+                    style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(255,255,255,.15)', border:'1px solid rgba(255,255,255,.25)', borderRadius:99, padding:'6px 14px', color:'white', fontSize:12, fontWeight:700, cursor:'pointer', marginBottom:20, backdropFilter:'blur(6px)' }}
+                >
+                    <ArrowLeft size={14} /> Retour à la liste
+                </button>
+
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:20, flexWrap:'wrap' }}>
+                    <div>
+                        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10, flexWrap:'wrap' }}>
+                            <MetaBadge icon={mc.icon} label={mc.label} />
+                            <MetaBadge icon={<Hash size={12}/>} label={NATURE_LABELS[form.nature] || form.nature} />
+                            <MetaBadge icon={<Package size={12}/>} label={TYPE_LABELS[form.type] || form.type} />
                         </div>
-                        <h1>Modifier le Dossier <span style={{ color: 'var(--primary)' }}>{dossierInfo?.code}</span></h1>
+                        <h1 style={{ margin:0, fontSize:26, fontWeight:900, color:'white', letterSpacing:'-.01em' }}>
+                            Modifier le Dossier
+                        </h1>
+                        <div style={{ fontSize:20, fontWeight:800, color:'rgba(255,255,255,.85)', marginTop:4, fontFamily:'monospace', letterSpacing:'.02em' }}>
+                            {dossierInfo?.code}
+                        </div>
+                        <div style={{ marginTop:10, display:'flex', alignItems:'center', gap:8 }}>
+                            <Building2 size={14} color="rgba(255,255,255,.7)" />
+                            <span style={{ fontSize:14, color:'rgba(255,255,255,.85)', fontWeight:600 }}>{clientName}</span>
+                        </div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '0.625rem', fontWeight: 800, color: 'var(--slate-400)', textTransform: 'uppercase' }}>Code Court</div>
-                        <div style={{ fontFamily: 'JetBrains Mono', fontWeight: 700, color: 'var(--slate-700)' }}>{dossierInfo?.shortCode}</div>
+                    <div style={{ background:'rgba(255,255,255,.12)', borderRadius:16, padding:'12px 20px', backdropFilter:'blur(8px)', border:'1px solid rgba(255,255,255,.2)', textAlign:'right' }}>
+                        <div style={{ fontSize:10, fontWeight:800, color:'rgba(255,255,255,.6)', textTransform:'uppercase', letterSpacing:'.1em' }}>Code Court</div>
+                        <div style={{ fontSize:20, fontWeight:900, color:'white', fontFamily:'monospace', marginTop:4 }}>{dossierInfo?.shortCode}</div>
                     </div>
-                </header>
+                </div>
+            </div>
 
-                <nav className="tab-bar">
-                    {tabs.map(tab => (
-                        <button
-                            key={tab.id}
-                            type="button"
-                            className={`tab-item ${activeTab === tab.id ? 'active' : ''} ${tab.disabled ? 'disabled' : ''}`}
-                            onClick={() => !tab.disabled && setActiveTab(tab.id)}
-                        >
-                            {tab.icon}
-                            {tab.label}
-                        </button>
-                    ))}
-                </nav>
+            {/* ── Floating content card ───────────────────────────────────── */}
+            <div style={{ maxWidth:1400, margin:'0 auto', padding:'0 32px 48px', marginTop:'-44px', position:'relative', zIndex:1 }}>
 
+                {/* ── Tab bar ── */}
+                <div style={{
+                    display:'flex', gap:4, background:'white', padding:6, borderRadius:16,
+                    border:'1px solid #e5e7eb', boxShadow:'0 8px 24px rgba(0,0,0,.10)',
+                    overflowX:'auto', scrollbarWidth:'none', marginBottom:24,
+                }}>
+                    <style>{`::-webkit-scrollbar{display:none}`}</style>
+                    {tabs.map(tab => {
+                        const isActive = activeTab === tab.id;
+                        return (
+                            <button
+                                key={tab.id}
+                                type="button"
+                                onClick={() => setActiveTab(tab.id)}
+                                style={{
+                                    display:'flex', alignItems:'center', gap:6,
+                                    padding:'8px 14px', borderRadius:10, border:'none', cursor:'pointer',
+                                    fontSize:12, fontWeight:700, whiteSpace:'nowrap',
+                                    transition:'all .15s',
+                                    background: isActive ? 'linear-gradient(135deg,#b45309,#f59e0b)' : 'transparent',
+                                    color: isActive ? 'white' : '#6b7280',
+                                    boxShadow: isActive ? '0 4px 12px rgba(245,158,11,.35)' : 'none',
+                                }}
+                            >
+                                {tab.icon}{tab.label}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* ── Detail tab ─────────────────────────────────────────── */}
                 {activeTab === 'detail' && (
-                    <form className="form-main" onSubmit={handleSubmit}>
-                        <div className="client-strip">
-                            <Building2 size={20} color="var(--primary)" />
-                            <h2>Client : <span style={{ color: 'var(--slate-900)' }}>{clientName}</span></h2>
+                    <form onSubmit={handleSubmit}>
+                        {error && (
+                            <div style={{ background:'#fff1f2', border:'1px solid #fecdd3', borderRadius:12, padding:'12px 18px', color:'#be123c', fontWeight:600, marginBottom:20, fontSize:14 }}>
+                                {error}
+                            </div>
+                        )}
+
+                        {/* ── Section: Identification & Type ── */}
+                        <FormSection icon={<FileSearch size={15}/>} title="Identification & Type">
+                            <div style={{ display:'grid', gridTemplateColumns:'repeat(12,1fr)', gap:20 }}>
+                                <Field label="Libellé du dossier" span={4}>
+                                    <PInput name="label" value={form.label} onChange={handleChange} required placeholder="Libellé…" />
+                                </Field>
+                                <Field label="Date Remise Docs" span={2}>
+                                    <PInput type="date" name="dateRemiseDocs" value={form.dateRemiseDocs} onChange={handleChange} />
+                                </Field>
+                                <Field label="Nature" span={2}>
+                                    <PSelect name="nature" value={form.nature} onChange={handleChange} disabled={!editCode}>
+                                        <option value="IMP">Importation</option>
+                                        <option value="EXP">Exportation</option>
+                                    </PSelect>
+                                </Field>
+                                <Field label="Expédition" span={2}>
+                                    <PSelect name="mode" value={form.mode} onChange={handleChange} disabled={!editCode}>
+                                        <option value="MA">Maritime</option>
+                                        <option value="AE">Aérien</option>
+                                        <option value="TE">Terrestre</option>
+                                    </PSelect>
+                                </Field>
+                                <Field label="Type" span={1}>
+                                    <PSelect name="type" value={form.type} onChange={handleChange} disabled={!editCode}>
+                                        <option value="TC">Conteneur</option>
+                                        <option value="GR">Groupage</option>
+                                        <option value="CO">Conv.</option>
+                                    </PSelect>
+                                </Field>
+                                <Field label="Document" span={1}>
+                                    <PInput readOnly value={form.mode === 'MA' ? 'BL' : form.mode === 'AE' ? 'LTA' : 'LVI'} />
+                                </Field>
+                            </div>
+                        </FormSection>
+
+                        {/* ── Section: Validation & Fiches ── */}
+                        <FormSection icon={<Shield size={15}/>} title="Validation & Fiches">
+                            <div style={{ display:'grid', gridTemplateColumns:'repeat(12,1fr)', gap:20 }}>
+                                <Field label="Numéro de dossier" span={4}>
+                                    <div style={{ display:'flex', gap:8 }}>
+                                        <PInput readOnly value={dossierInfo?.code || ''} style={{ flex:1 }} />
+                                        <button
+                                            type="button"
+                                            title="Débloquer les champs du code"
+                                            onClick={() => setEditCode(!editCode)}
+                                            style={{
+                                                padding:'0 12px', borderRadius:10, border:'none', cursor:'pointer',
+                                                transition:'all .15s', flexShrink:0,
+                                                background: editCode ? 'linear-gradient(135deg,#b45309,#f59e0b)' : '#f1f5f9',
+                                                color: editCode ? 'white' : '#64748b',
+                                                boxShadow: editCode ? '0 4px 12px rgba(245,158,11,.35)' : 'none',
+                                            }}
+                                        >
+                                            <Settings size={15} />
+                                        </button>
+                                    </div>
+                                </Field>
+                                <Field label="Validé par" span={4}>
+                                    <PInput readOnly value={currentUser?.name || ''} />
+                                </Field>
+                                <Field label="Fiche Dossier (Scan)" span={4}>
+                                    <input
+                                        type="file"
+                                        onChange={e => setFile(e.target.files[0])}
+                                        style={{ width:'100%', padding:'9px 12px', border:'1px solid #e5e7eb', borderRadius:10, fontSize:13, background:'#f8fafc', cursor:'pointer' }}
+                                    />
+                                    {dossierInfo?.fileUrl && (
+                                        <a
+                                            href={`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}${dossierInfo.fileUrl}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            style={{ display:'flex', alignItems:'center', gap:4, color:'#b45309', fontWeight:600, fontSize:12, marginTop:6, textDecoration:'none' }}
+                                        >
+                                            <LinkIcon size={11} /> Voir la fiche actuelle
+                                        </a>
+                                    )}
+                                </Field>
+                            </div>
+                        </FormSection>
+
+                        {/* ── Section: Contact & Suivi ── */}
+                        <FormSection icon={<User size={15}/>} title="Contact & Suivi">
+                            <div style={{ display:'grid', gridTemplateColumns:'repeat(12,1fr)', gap:20 }}>
+                                <Field label="Point focal" span={4}>
+                                    <PInput name="contactName" value={form.contactName} onChange={handleChange} placeholder="Nom du contact…" />
+                                </Field>
+                                <Field label="Téléphone" span={4}>
+                                    <PInput name="contactPhone" value={form.contactPhone} onChange={handleChange} placeholder="+221…" />
+                                </Field>
+                                <Field label="Email" span={4}>
+                                    <PInput name="contactEmail" value={form.contactEmail} onChange={handleChange} placeholder="email@domaine.com" />
+                                </Field>
+                                <Field label="Observations / Notes" span={12}>
+                                    <textarea
+                                        name="observations"
+                                        rows={3}
+                                        value={form.observations}
+                                        onChange={handleChange}
+                                        placeholder="Commentaires internes…"
+                                        style={{
+                                            width:'100%', padding:'10px 14px', border:'1px solid #e5e7eb', borderRadius:10,
+                                            fontSize:13, background:'#f8fafc', outline:'none', resize:'vertical',
+                                            fontFamily:'inherit', transition:'border-color .15s, box-shadow .15s',
+                                            boxSizing:'border-box',
+                                        }}
+                                        onFocus={e => { e.target.style.borderColor='#f59e0b'; e.target.style.boxShadow='0 0 0 3px rgba(245,158,11,.15)'; e.target.style.background='white'; }}
+                                        onBlur={e => { e.target.style.borderColor='#e5e7eb'; e.target.style.boxShadow='none'; e.target.style.background='#f8fafc'; }}
+                                    />
+                                </Field>
+                            </div>
+                        </FormSection>
+
+                        {/* ── Toggle cards ── */}
+                        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:16, marginBottom:24 }}>
+                            <CheckCard
+                                label="Prêt pour facturation"
+                                desc="Marquer comme éligible à la clôture financière"
+                                checked={form.isFacturable}
+                                onChange={() => handleChange({ target:{ name:'isFacturable', type:'checkbox', checked:!form.isFacturable } })}
+                            />
+                            <CheckCard
+                                label="Étape de Cotation"
+                                desc="Requiert l'imputation d'un déclarant"
+                                checked={form.quotationStep}
+                                onChange={() => handleChange({ target:{ name:'quotationStep', type:'checkbox', checked:!form.quotationStep } })}
+                            />
                         </div>
 
-                        <div className="form-content">
-                            {/* Section 1: Informations Générales */}
-                            <div className="form-section">
-                                <div className="section-header">
-                                    <FileSearch size={14} color="var(--slate-400)" />
-                                    <span className="section-title">Identification & Type</span>
-                                </div>
-
-                                <div className="grid-form">
-                                    <div className="input-group col-4">
-                                        <label className="input-label">Libellé du dossier</label>
-                                        <input
-                                            name="label"
-                                            className="premium-input"
-                                            value={form.label}
-                                            onChange={handleChange}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="input-group col-2">
-                                        <label className="input-label">Nature</label>
-                                        <select
-                                            name="nature"
-                                            className="premium-select"
-                                            value={form.nature}
-                                            onChange={handleChange}
-                                            disabled={!editCode}
-                                        >
-                                            <option value="IMP">Importation</option>
-                                            <option value="EXP">Exportation</option>
-                                        </select>
-                                    </div>
-                                    <div className="input-group col-2">
-                                        <label className="input-label">Expédition</label>
-                                        <select
-                                            name="mode"
-                                            className="premium-select"
-                                            value={form.mode}
-                                            onChange={handleChange}
-                                            disabled={!editCode}
-                                        >
-                                            <option value="MA">Maritime</option>
-                                            <option value="AE">Aérien</option>
-                                            <option value="TE">Terrestre</option>
-                                        </select>
-                                    </div>
-                                    <div className="input-group col-2">
-                                        <label className="input-label">Type</label>
-                                        <select
-                                            name="type"
-                                            className="premium-select"
-                                            value={form.type}
-                                            onChange={handleChange}
-                                            disabled={!editCode}
-                                        >
-                                            <option value="TC">Conteneur</option>
-                                            <option value="GR">Groupage</option>
-                                            <option value="CO">Conv.</option>
-                                        </select>
-                                    </div>
-                                    <div className="input-group col-2">
-                                        <label className="input-label">Document</label>
-                                        <input
-                                            className="premium-input"
-                                            readOnly
-                                            value={form.mode === 'MA' ? 'BL' : form.mode === 'AE' ? 'LTA' : 'LVI'}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Section 2: Validation & Fichiers */}
-                            <div className="form-section">
-                                <div className="section-header">
-                                    <Shield size={14} color="var(--slate-400)" />
-                                    <span className="section-title">Validation & Fiches</span>
-                                </div>
-
-                                <div className="grid-form">
-                                    <div className="input-group col-4">
-                                        <label className="input-label">Numéro de dossier</label>
-                                        <div className="input-with-actions">
-                                            <input className="premium-input" readOnly value={dossierInfo?.code || ''} />
+                        {/* ── Documents ── */}
+                        {documents.length > 0 && (
+                            <FormSection icon={<FileText size={15}/>} title="Documents Associés au Dossier">
+                                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                                    {documents.map(doc => (
+                                        <div key={doc.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 18px', background:'#f8fafc', border:'1px solid #e5e7eb', borderRadius:12 }}>
+                                            <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+                                                <div style={{ padding:10, background:'white', borderRadius:10, boxShadow:'0 1px 3px rgba(0,0,0,.08)' }}>
+                                                    <FileText size={18} color="#b45309" />
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontWeight:700, color:'#111827', fontSize:14 }}>{doc.label || doc.type}</div>
+                                                    <div style={{ fontSize:12, color:'#9ca3af', marginTop:2 }}>
+                                                        {doc.number ? `N° ${doc.number} • ` : ''}
+                                                        Ajouté le {new Date(doc.createdAt).toLocaleDateString('fr-FR')}
+                                                    </div>
+                                                </div>
+                                            </div>
                                             <button
                                                 type="button"
-                                                className={`mini-btn ${editCode ? 'active' : ''}`}
-                                                onClick={() => setEditCode(!editCode)}
-                                                title="Modifier les champs verrouillés"
+                                                onClick={() => {
+                                                    const token = localStorage.getItem('token');
+                                                    window.open(`${documentsAPI.viewUrl(doc.id)}?token=${token}`, '_blank');
+                                                }}
+                                                style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:10, border:'1px solid #e5e7eb', background:'white', color:'#374151', fontWeight:600, fontSize:13, cursor:'pointer' }}
                                             >
-                                                <Settings size={16} />
+                                                <Eye size={14}/> Consulter
                                             </button>
                                         </div>
-                                    </div>
-                                    <div className="input-group col-4">
-                                        <label className="input-label">Validé par</label>
-                                        <input className="premium-input" readOnly value={currentUser?.name || ''} />
-                                    </div>
-                                    <div className="input-group col-4">
-                                        <label className="input-label">Fiche Dossier (Scan)</label>
-                                        <input type="file" className="premium-input" onChange={handleFileChange} style={{ padding: '0.5rem' }} />
-                                        {dossierInfo?.fileUrl && (
-                                            <a
-                                                href={`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}${dossierInfo.fileUrl}`}
-                                                target="_blank"
-                                                className="back-link"
-                                                style={{ marginTop: '0.25rem', fontSize: '0.75rem' }}
-                                            >
-                                                <LinkIcon size={12} /> Voir la fiche actuelle
-                                            </a>
-                                        )}
-                                    </div>
+                                    ))}
                                 </div>
-                            </div>
+                            </FormSection>
+                        )}
 
-                            {/* Section 3: Contact & Observations */}
-                            <div className="form-section">
-                                <div className="section-header">
-                                    <User size={14} color="var(--slate-400)" />
-                                    <span className="section-title">Contact & Suivi</span>
-                                </div>
-
-                                <div className="grid-form">
-                                    <div className="input-group col-4">
-                                        <label className="input-label">Point focal</label>
-                                        <input name="contactName" className="premium-input" value={form.contactName} onChange={handleChange} placeholder="Nom du contact..." />
-                                    </div>
-                                    <div className="input-group col-4">
-                                        <label className="input-label">Téléphone</label>
-                                        <input name="contactPhone" className="premium-input" value={form.contactPhone} onChange={handleChange} placeholder="+221..." />
-                                    </div>
-                                    <div className="input-group col-4">
-                                        <label className="input-label">Email</label>
-                                        <input name="contactEmail" className="premium-input" value={form.contactEmail} onChange={handleChange} placeholder="email@domaine.com" />
-                                    </div>
-                                    <div className="input-group col-12">
-                                        <label className="input-label">Observations / Notes</label>
-                                        <textarea name="observations" rows="3" className="premium-textarea" value={form.observations} onChange={handleChange} placeholder="Commentaires internes..." />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginTop: '1rem' }}>
-                                <div className="checkbox-card" onClick={() => handleChange({ target: { name: 'isFacturable', type: 'checkbox', checked: !form.isFacturable } })}>
-                                    <input type="checkbox" checked={form.isFacturable} readOnly />
-                                    <div>
-                                        <div className="checkbox-label">Prêt pour facturation</div>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--slate-500)' }}>Marquer comme éligible à la clôture financière</div>
-                                    </div>
-                                </div>
-                                <div className="checkbox-card" onClick={() => handleChange({ target: { name: 'quotationStep', type: 'checkbox', checked: !form.quotationStep } })}>
-                                    <input type="checkbox" checked={form.quotationStep} readOnly />
-                                    <div>
-                                        <div className="checkbox-label">Étape de Cotation</div>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--slate-500)' }}>Requiert l'imputation d'un déclarant</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="footer-actions">
-                            <button type="button" className="btn btn-secondary" onClick={() => navigate('/dossiers')}>Annuler</button>
-                            <button type="submit" className="btn btn-primary">
-                                <Save size={18} />
-                                Enregistrer les modifications
+                        {/* ── Footer ── */}
+                        <div style={{ display:'flex', justifyContent:'flex-end', gap:12, paddingTop:8 }}>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/dossiers')}
+                                style={{ display:'flex', alignItems:'center', gap:8, padding:'11px 24px', borderRadius:12, border:'1px solid #e5e7eb', background:'white', color:'#374151', fontWeight:700, fontSize:14, cursor:'pointer' }}
+                            >
+                                <X size={16}/> Annuler
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={saving}
+                                style={{
+                                    display:'flex', alignItems:'center', gap:8,
+                                    padding:'11px 28px', borderRadius:12, border:'none',
+                                    background: saving ? '#d97706' : 'linear-gradient(135deg,#b45309,#f59e0b)',
+                                    color:'white', fontWeight:700, fontSize:14, cursor: saving ? 'not-allowed' : 'pointer',
+                                    boxShadow:'0 4px 14px rgba(245,158,11,.4)',
+                                    transition:'all .15s',
+                                }}
+                            >
+                                <Save size={16}/> {saving ? 'Enregistrement…' : 'Enregistrer les modifications'}
                             </button>
                         </div>
                     </form>
                 )}
 
-                {activeTab === 'cotation' && (
-                    <div className="premium-card" style={{ padding: '0.5rem' }}>
-                        <CotationManager dossierId={id} />
-                    </div>
-                )}
-
-                {activeTab === 'ot' && (
-                    <div className="premium-card" style={{ padding: '0.5rem' }}>
-                        <OrdreTransitManager dossierId={id} />
+                {/* ── Sub-managers ─────────────────────────────────────────── */}
+                {activeTab !== 'detail' && (
+                    <div style={{ background:'white', borderRadius:20, border:'1px solid #e5e7eb', boxShadow:'0 4px 16px rgba(0,0,0,.06)', padding:8, overflow:'hidden' }}>
+                        {activeTab === 'cotation'            && <CotationManager dossierId={id} />}
+                        {activeTab === 'ot'                  && <OrdreTransitManager dossierId={id} />}
+                        {activeTab === 'titre_transport'     && <TitreTransportManager dossierId={id} />}
+                        {activeTab === 'transport'           && <TransportManager dossierId={id} />}
+                        {activeTab === 'composition'         && <CompositionTransportManager dossierId={id} dossierType={dossierInfo?.type} />}
+                        {activeTab === 'ordre-transport'     && <OrdreTransportManager dossierId={id} />}
+                        {activeTab === 'declaration'         && <DeclarationManager dossierId={id} />}
+                        {activeTab === 'mise_livraison'      && <MiseEnLivraisonManager dossierId={id} />}
+                        {activeTab === 'bordereau_livraison' && <BordereauLivraisonManager dossierId={id} />}
+                        {activeTab === 'devis'               && <DevisManager dossierId={id} />}
+                        {activeTab === 'factures_tiers'      && <FacturesTiersManager dossierId={id} />}
+                        {activeTab === 'facturation'         && <FacturationManager dossierId={id} />}
                     </div>
                 )}
             </div>
         </div>
     );
 };
+
+/* ─── Sub-components ─────────────────────────────────────────────────────── */
+
+const FormSection = ({ icon, title, children }) => (
+    <div style={{ background:'white', borderRadius:20, border:'1px solid #e5e7eb', boxShadow:'0 2px 8px rgba(0,0,0,.05)', padding:'24px 28px', marginBottom:20 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20, paddingBottom:14, borderBottom:'1px solid #f1f5f9' }}>
+            <div style={{ display:'flex', padding:7, background:'#fffbeb', borderRadius:8, color:'#b45309' }}>{icon}</div>
+            <span style={{ fontSize:11, fontWeight:800, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'.08em' }}>{title}</span>
+        </div>
+        {children}
+    </div>
+);
+
+const Field = ({ label, span = 4, children }) => (
+    <div style={{ gridColumn:`span ${span}` }}>
+        <label style={{ display:'block', fontSize:12, fontWeight:700, color:'#475569', marginBottom:6 }}>{label}</label>
+        {children}
+    </div>
+);
+
+const inputBase = {
+    width:'100%', padding:'10px 14px', border:'1px solid #e5e7eb', borderRadius:10,
+    fontSize:13, background:'#f8fafc', outline:'none', transition:'border-color .15s, box-shadow .15s, background .15s',
+    boxSizing:'border-box', fontFamily:'inherit',
+};
+
+const PInput = ({ readOnly, style: extraStyle, ...props }) => (
+    <input
+        {...props}
+        readOnly={readOnly}
+        style={{
+            ...inputBase,
+            ...(readOnly ? { background:'#f1f5f9', color:'#94a3b8', borderStyle:'dashed', cursor:'default' } : {}),
+            ...extraStyle,
+        }}
+        onFocus={readOnly ? undefined : e => { e.target.style.borderColor='#f59e0b'; e.target.style.boxShadow='0 0 0 3px rgba(245,158,11,.15)'; e.target.style.background='white'; }}
+        onBlur={readOnly ? undefined : e => { e.target.style.borderColor='#e5e7eb'; e.target.style.boxShadow='none'; e.target.style.background='#f8fafc'; }}
+    />
+);
+
+const PSelect = ({ disabled, ...props }) => (
+    <select
+        {...props}
+        disabled={disabled}
+        style={{
+            ...inputBase,
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            ...(disabled ? { background:'#f1f5f9', color:'#94a3b8', borderStyle:'dashed' } : {}),
+        }}
+        onFocus={disabled ? undefined : e => { e.target.style.borderColor='#f59e0b'; e.target.style.boxShadow='0 0 0 3px rgba(245,158,11,.15)'; e.target.style.background='white'; }}
+        onBlur={disabled ? undefined : e => { e.target.style.borderColor='#e5e7eb'; e.target.style.boxShadow='none'; e.target.style.background='#f8fafc'; }}
+    />
+);
+
+const CheckCard = ({ label, desc, checked, onChange }) => (
+    <div
+        onClick={onChange}
+        style={{
+            display:'flex', alignItems:'center', gap:16, padding:'18px 20px',
+            background: checked ? '#fffbeb' : '#f8fafc',
+            border: `1.5px solid ${checked ? '#f59e0b' : '#e5e7eb'}`,
+            borderRadius:14, cursor:'pointer', transition:'all .15s',
+        }}
+    >
+        <div style={{
+            width:22, height:22, borderRadius:6, border:`2px solid ${checked ? '#f59e0b' : '#d1d5db'}`,
+            background: checked ? '#f59e0b' : 'white', flexShrink:0,
+            display:'flex', alignItems:'center', justifyContent:'center', transition:'all .15s',
+        }}>
+            {checked && <CheckCircle size={13} color="white" />}
+        </div>
+        <div>
+            <div style={{ fontSize:14, fontWeight:700, color:'#111827' }}>{label}</div>
+            <div style={{ fontSize:12, color:'#9ca3af', marginTop:2 }}>{desc}</div>
+        </div>
+    </div>
+);
 
 export default DossierEdit;

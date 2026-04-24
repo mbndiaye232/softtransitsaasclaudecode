@@ -224,6 +224,10 @@ const OrdreTransitManager = ({ dossierId }) => {
                                 <span className="form-label">Provenance</span>
                                 <div style={{ fontWeight: 600 }}>{ot.PROVENANCE || 'N/A'}</div>
                             </div>
+                            <div>
+                                <span className="form-label">Numéro de série</span>
+                                <div style={{ fontWeight: 600 }}>{ot.NumeroSerie || 'N/A'}</div>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -291,6 +295,10 @@ const OrdreTransitManager = ({ dossierId }) => {
                                             </div>
                                         )}
                                 </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Numéro de série</label>
+                                <input className="form-input" value={formData.NumeroSerie} onChange={e => setFormData({ ...formData, NumeroSerie: e.target.value })} />
                             </div>
                         </div>
 

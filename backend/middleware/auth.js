@@ -1,57 +1,37 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../config/database');
 
-/**
- * Middleware to verify JWT token and attach user info to request
- */
 const authMiddleware = async (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'No token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
     try {
-        // Get token from header
-        const authHeader = req.headers.authorization;
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
 
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return res.status(401).json({ error: 'No token provided' });
-        }
-
-        const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-
-        // Verify token
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-        // Get user from database with structur info
+        const userId = decoded.userId || decoded.id;
         const [users] = await pool.query(
-            `SELECT 
-        a.IDAgents as id,
-        a.structur_id,
-        a.NomAgent as name,
-        a.Email as email,
-        a.Login as login,
-        a.role,
-        a.is_active,
-        s.is_provider
-      FROM Agents a
-      JOIN structur s ON a.structur_id = s.IDSociete
-      WHERE a.IDAgents = ? AND a.is_active = 1`,
-            [decoded.userId]
+            `SELECT a.IDAgents as id, a.NomAgent as name, a.Email as email,
+                    a.Login as login, a.role, a.structur_id, a.is_active,
+                    s.NomSociete as company_name, s.is_provider
+             FROM Agents a
+             JOIN structur s ON a.structur_id = s.IDSociete
+             WHERE a.IDAgents = ? AND a.is_active = 1`,
+            [userId]
         );
 
-        if (users.length === 0) {
+        if (!users.length) {
             return res.status(401).json({ error: 'User not found or inactive' });
         }
 
-        // Attach user to request
         req.user = users[0];
         console.log('AuthMiddleware: User found:', req.user.id, 'Role:', req.user.role, 'IsProvider:', req.user.is_provider);
         next();
     } catch (error) {
-        if (error.name === 'JsonWebTokenError') {
-            return res.status(401).json({ error: 'Invalid token' });
-        }
-        if (error.name === 'TokenExpiredError') {
-            return res.status(401).json({ error: 'Token expired' });
-        }
         console.error('Auth middleware error:', error);
-        res.status(500).json({ error: 'Authentication failed' });
+        return res.status(401).json({ error: 'Invalid token' });
     }
 };
 
@@ -63,19 +43,25 @@ const requireRole = (...roles) => {
         if (!req.user) {
             return res.status(401).json({ error: 'Not authenticated' });
         }
-
         if (!roles.includes(req.user.role)) {
             return res.status(403).json({ error: 'Insufficient permissions' });
         }
-
         next();
     };
 };
 
 /**
+ * Middleware super admin : role SUPER_ADMIN uniquement
+ */
+const requireSuperAdmin = (req, res, next) => {
+    if (!req.user || req.user.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ error: 'Accès réservé au super administrateur' });
+    }
+    next();
+};
+
+/**
  * Middleware to check functional permissions
- * @param {string} resourceCode - Code of the resource (e.g., 'DOSSIERS')
- * @param {string} accessLevel - can_view, can_create, can_edit, can_delete
  */
 const checkPermission = (resourceCode, accessLevel) => {
     return async (req, res, next) => {
@@ -83,14 +69,19 @@ const checkPermission = (resourceCode, accessLevel) => {
             return res.status(401).json({ error: 'Not authenticated' });
         }
 
-        // Admins of the provider company have all permissions
-        if (req.user.role === 'ADMIN' && req.user.is_provider) {
+        // SUPER_ADMIN a tous les droits
+        if (req.user.role === 'SUPER_ADMIN') {
+            return next();
+        }
+
+        // ADMIN de sa propre société a tous les droits sur sa société
+        if (req.user.role === 'ADMIN') {
             return next();
         }
 
         try {
             const [permissions] = await pool.query(
-                `SELECT ap.* 
+                `SELECT ap.*
                  FROM agent_permissions ap
                  JOIN permissions p ON ap.permission_id = p.id
                  WHERE ap.agent_id = ? AND p.code = ?`,
@@ -98,13 +89,6 @@ const checkPermission = (resourceCode, accessLevel) => {
             );
 
             if (permissions.length === 0) {
-                // If it's an ADMIN of a regular company, they might have full access to their company
-                // But the user requested "associé aux fonctionnalités avec des privilèges déterminés"
-                // So even ADMINs should have permissions assigned? 
-                // Usually, the company creator (ADMIN) should have all permissions by default.
-                if (req.user.role === 'ADMIN') {
-                    return next();
-                }
                 return res.status(403).json({ error: `No permission assigned for ${resourceCode}` });
             }
 
@@ -122,26 +106,22 @@ const checkPermission = (resourceCode, accessLevel) => {
 };
 
 /**
- * Middleware to ensure user can only access their own company's data
- * Provider agents can access all data if they don't provide a specific structur_id
+ * Middleware tenant : isole les données par société
  */
 const tenantMiddleware = (req, res, next) => {
     if (!req.user) {
         return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    // Default to the user's company
     req.structur_id = req.user.structur_id;
 
-    // If provider agent, they can specify a different structur_id in query or body
-    if (req.user.is_provider) {
+    // SUPER_ADMIN peut accéder à toutes les sociétés
+    if (req.user.role === 'SUPER_ADMIN') {
         const target_structur_id = req.query.structur_id || req.body.structur_id;
         if (target_structur_id) {
             req.structur_id = target_structur_id;
             req.is_viewing_all = false;
         } else if (req.method === 'GET') {
-            // Special flag to indicate they want to see "everything" across all tenants
-            // if no specific company is requested
             req.is_viewing_all = true;
         }
     }
@@ -149,9 +129,47 @@ const tenantMiddleware = (req, res, next) => {
     next();
 };
 
+/**
+ * Bloque les opérations d'écriture si crédits épuisés (mode crédits).
+ */
+const checkCreditAccess = async (req, res, next) => {
+    if (req.method === 'GET') return next();
+
+    // SUPER_ADMIN : pas de restriction
+    if (req.user && req.user.role === 'SUPER_ADMIN') return next();
+
+    try {
+        const [rows] = await pool.query(
+            'SELECT billing_mode, credit_balance FROM structur WHERE IDSociete = ?',
+            [req.structur_id || req.user.structur_id]
+        );
+        if (!rows.length) return next();
+
+        const { billing_mode, credit_balance } = rows[0];
+
+        if (billing_mode === 'forfait') return next();
+
+        if (parseFloat(credit_balance) <= 0) {
+            return res.status(402).json({
+                error: 'Crédits épuisés',
+                message: 'Votre solde de crédits est à 0. Rechargez votre compte pour continuer à saisir, modifier ou supprimer des données.',
+                code: 'NO_CREDITS',
+                credit_balance: 0
+            });
+        }
+
+        next();
+    } catch (err) {
+        console.error('Credit access check error:', err);
+        next();
+    }
+};
+
 module.exports = {
     authMiddleware,
     requireRole,
+    requireSuperAdmin,
     checkPermission,
-    tenantMiddleware
+    tenantMiddleware,
+    checkCreditAccess
 };

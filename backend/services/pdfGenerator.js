@@ -15,12 +15,6 @@ const A3_HEIGHT = 841.89;
 class NoteDetailPDFGenerator {
     constructor(pool) {
         this.pool = pool;
-        this.outputDir = path.join(__dirname, '..', 'uploads', 'pdf', 'notes');
-
-        // Ensure output directory exists
-        if (!fs.existsSync(this.outputDir)) {
-            fs.mkdirSync(this.outputDir, { recursive: true });
-        }
     }
 
     /**
@@ -46,11 +40,19 @@ class NoteDetailPDFGenerator {
             margins: { top: 20, bottom: 20, left: 30, right: 30 }
         });
 
-        // 4. Setup output file
+        // 4. Setup output file dynamically based on client
+        const clientId = data.note.IDCLIENTS || 'misc';
+        const clientNameSafe = (data.note.NomClient || 'unknown').replace(/[^a-zA-Z0-9]/g, '_');
+        const dynamicOutputDir = path.join(__dirname, '..', 'uploads', 'clients', `${clientId}_${clientNameSafe}`, 'notes_detail');
+
+        if (!fs.existsSync(dynamicOutputDir)) {
+            fs.mkdirSync(dynamicOutputDir, { recursive: true });
+        }
+
         // Sanitize code dossier to be safe for filenames
         const safeCode = (data.note.CodeDossier || 'ND').replace(/[^a-zA-Z0-9-_]/g, '-');
         const filename = `note_de_detail_${safeCode}_${sequence}.pdf`;
-        const outputPath = path.join(this.outputDir, filename);
+        const outputPath = path.join(dynamicOutputDir, filename);
         const writeStream = fs.createWriteStream(outputPath);
         doc.pipe(writeStream);
 
@@ -94,13 +96,13 @@ class NoteDetailPDFGenerator {
         try {
             // Note de détail
             const [notes] = await connection.query(
-                `SELECT nd.*, d.CodeDossier, d.Libelle, d.NatureDossier, d.ModeExpedition,
+                `SELECT nd.*, d.CodeDossier, d.Libelle, d.NatureDossier, d.ModeExpedition, d.IDCLIENTS,
                         c.NomRS as NomClient, c.NINEA as ClientNINEA,
                         bl.NumeroTitreTransport as NumeroBL
                  FROM notesdedetails nd
                  LEFT JOIN dossiers d ON nd.IDDossiers = d.IDDossiers
                  LEFT JOIN clients c ON d.IDCLIENTS = c.IDCLIENTS
-                 LEFT JOIN BillOfLanding bl ON d.IDDossiers = bl.IDDossiers
+                 LEFT JOIN billoflading bl ON d.IDDossiers = bl.idbl
                  WHERE nd.IDNotesDeDetails = ?`,
                 [noteId]
             );
@@ -198,13 +200,25 @@ class NoteDetailPDFGenerator {
         let logoHeight = 50;
 
         // Add logo if available
-        if (structure && structure.logoSociete) {
-            try {
-                // Convert BLOB to buffer and add to PDF
-                const logoBuffer = Buffer.from(structure.logoSociete);
-                doc.image(logoBuffer, logoX, 20, { height: logoHeight });
-            } catch (err) {
-                console.error('Error adding logo:', err);
+        if (structure) {
+            if (structure.cheminlogo) {
+                try {
+                    const logoPath = path.isAbsolute(structure.cheminlogo)
+                        ? structure.cheminlogo
+                        : path.join(__dirname, '..', structure.cheminlogo);
+                    if (fs.existsSync(logoPath)) {
+                        doc.image(logoPath, 20, 20, { height: 50 });
+                    }
+                } catch (e) {
+                    console.error('Error loading logo from path:', e);
+                }
+            } else if (structure.logoSociete) {
+                try {
+                    const logoBuffer = Buffer.from(structure.logoSociete);
+                    doc.image(logoBuffer, 20, 20, { height: 50 });
+                } catch (err) {
+                    console.error('Error adding logo BLOB:', err);
+                }
             }
         }
 

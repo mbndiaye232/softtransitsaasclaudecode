@@ -23,6 +23,8 @@ const storage = multer.diskStorage({
             uploadPath = 'uploads/societe/cachets';
         } else if (file.fieldname === 'file') {
             uploadPath = 'uploads/dossiers';
+        } else if (file.fieldname === 'justificatif') {
+            uploadPath = 'uploads/justificatifs';
         }
 
         createDirIfNotExists(uploadPath);
@@ -36,10 +38,12 @@ const storage = multer.diskStorage({
     }
 });
 
-// File filter
 const fileFilter = (req, file, cb) => {
-    // Accept images and documents
-    if (!file.originalname.match(/\.(jpg|jpeg|png|gif|pdf|doc|docx)$/)) {
+    console.log(`[Multer Filter] Incoming file: fieldname=${file.fieldname}, originalname=${file.originalname}, mimetype=${file.mimetype}`);
+    
+    // Accept images and documents (case-insensitive)
+    if (!file.originalname || !file.originalname.match(/\.(jpg|jpeg|png|gif|pdf|doc|docx|xls|xlsx|zip|txt)$/i)) {
+        console.error(`[Multer Filter] Rejected file: ${file.originalname}`);
         return cb(new Error('Only image and document files are allowed!'), false);
     }
     cb(null, true);

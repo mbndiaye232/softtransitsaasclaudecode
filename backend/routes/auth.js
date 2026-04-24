@@ -81,7 +81,7 @@ router.post('/register', async (req, res) => {
         credit_balance,
         is_active,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, 0, 1, NOW())`,
+      ) VALUES (?, ?, ?, ?, ?, 50, 1, NOW())`,
             [companyName, companyEmail, companyAddress || '', companyPhone || '', countryId || null]
         );
 

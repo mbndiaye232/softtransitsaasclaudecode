@@ -1,37 +1,83 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usersAPI } from '../services/api'
 import {
-    Users,
-    UserPlus,
-    Search,
-    Edit,
-    UserMinus,
-    UserCheck,
-    Shield,
-    Mail,
-    Key,
-    Layers,
-    MoreHorizontal,
-    Info,
-    ChevronLeft,
-    CheckCircle2,
-    XCircle,
-    User
+    Users, UserPlus, Search, Edit2, UserMinus, UserCheck,
+    Shield, Key, Layers, X, CheckCircle2, Info,
+    ShieldAlert, ShieldCheck, UserCog
 } from 'lucide-react'
 
+/* ─── Palette avatar par initiale ───────────────────────────────────────── */
+const AVATAR_COLORS = [
+    { bg: '#eff6ff', text: '#2563eb' },
+    { bg: '#f5f3ff', text: '#7c3aed' },
+    { bg: '#fdf2f8', text: '#db2777' },
+    { bg: '#fff7ed', text: '#ea580c' },
+    { bg: '#f0fdf4', text: '#16a34a' },
+    { bg: '#fefce8', text: '#ca8a04' },
+    { bg: '#f0f9ff', text: '#0284c7' },
+    { bg: '#fff1f2', text: '#e11d48' },
+]
+const avatarColor = (name = '') => AVATAR_COLORS[(name.charCodeAt(0) || 0) % AVATAR_COLORS.length]
+const initials = (name = '') => name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase()).join('')
+
+/* ─── Config des rôles ───────────────────────────────────────────────────── */
+const ROLE_CONFIG = {
+    SUPER_ADMIN: { label: 'Super Admin', bg: '#fef3c7', color: '#92400e', icon: <ShieldAlert size={11} /> },
+    ADMIN:       { label: 'Admin',       bg: '#fee2e2', color: '#991b1b', icon: <ShieldCheck size={11} /> },
+    EDITOR:      { label: 'Éditeur',     bg: '#eef2ff', color: '#3730a3', icon: <Shield size={11} /> },
+    USER:        { label: 'Utilisateur', bg: '#f1f5f9', color: '#475569', icon: <Shield size={11} /> },
+}
+const roleConf = (role) => ROLE_CONFIG[role] || ROLE_CONFIG.USER
+
+/* ─── Sous-composants ────────────────────────────────────────────────────── */
+const StatPill = ({ icon, label, value, color }) => (
+    <div style={{
+        display: 'flex', alignItems: 'center', gap: '10px',
+        background: 'white', border: '1px solid #e5e7eb',
+        borderRadius: '12px', padding: '12px 18px',
+        boxShadow: '0 1px 3px rgba(0,0,0,.06)', minWidth: 'fit-content',
+    }}>
+        <span style={{ color, display: 'flex' }}>{icon}</span>
+        <div>
+            <div style={{ fontSize: '18px', fontWeight: 800, color: '#111827', lineHeight: 1 }}>{value}</div>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '.04em', marginTop: '2px' }}>{label}</div>
+        </div>
+    </div>
+)
+
+const FilterChip = ({ label, active, onClick, count }) => (
+    <button onClick={onClick} style={{
+        display: 'flex', alignItems: 'center', gap: '6px',
+        padding: '6px 14px', borderRadius: '99px', border: 'none', cursor: 'pointer',
+        fontSize: '13px', fontWeight: 600, transition: 'all .15s',
+        background: active ? '#111827' : '#f3f4f6',
+        color: active ? 'white' : '#6b7280',
+    }}>
+        {label}
+        {count !== undefined && (
+            <span style={{
+                fontSize: '11px', fontWeight: 700,
+                background: active ? 'rgba(255,255,255,.25)' : '#e5e7eb',
+                color: active ? 'white' : '#9ca3af',
+                borderRadius: '99px', padding: '1px 6px',
+            }}>{count}</span>
+        )}
+    </button>
+)
+
+/* ─── Page principale ────────────────────────────────────────────────────── */
 export default function UserList() {
     const navigate = useNavigate()
     const [users, setUsers] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
     const [success, setSuccess] = useState('')
-    const [filter, setFilter] = useState('all') // all, active, inactive
+    const [filter, setFilter] = useState('all')
     const [searchTerm, setSearchTerm] = useState('')
+    const [hoveredRow, setHoveredRow] = useState(null)
 
-    useEffect(() => {
-        loadUsers()
-    }, [])
+    useEffect(() => { loadUsers() }, [])
 
     const loadUsers = async () => {
         try {
@@ -39,248 +85,324 @@ export default function UserList() {
             setUsers(response.data)
         } catch (err) {
             setError('Impossible de charger les agents')
-            console.error(err)
         } finally {
             setLoading(false)
         }
     }
 
-    const handleDeactivate = async (id) => {
-        if (!window.confirm('Êtes-vous sûr de vouloir désactiver cet agent ?')) return
+    const flash = (msg, isError = false) => {
+        if (isError) { setError(msg); setTimeout(() => setError(''), 4000) }
+        else { setSuccess(msg); setTimeout(() => setSuccess(''), 3000) }
+    }
 
-        try {
-            await usersAPI.delete(id)
-            setSuccess('Agent désactivé avec succès')
-            loadUsers()
-            setTimeout(() => setSuccess(''), 3000)
-        } catch (err) {
-            setError(err.response?.data?.error || 'Impossible de désactiver l\'agent')
-            console.error(err)
-        }
+    const handleDeactivate = async (id) => {
+        if (!window.confirm('Désactiver cet agent ?')) return
+        try { await usersAPI.delete(id); flash('Agent désactivé'); loadUsers() }
+        catch (err) { flash(err.response?.data?.error || 'Erreur', true) }
     }
 
     const handleReactivate = async (id) => {
-        if (!window.confirm('Êtes-vous sûr de vouloir réactiver cet agent ?')) return
-
-        try {
-            await usersAPI.reactivate(id)
-            setSuccess('Agent réactivé avec succès')
-            loadUsers()
-            setTimeout(() => setSuccess(''), 3000)
-        } catch (err) {
-            setError(err.response?.data?.error || 'Impossible de réactiver l\'agent')
-            console.error(err)
-        }
+        if (!window.confirm('Réactiver cet agent ?')) return
+        try { await usersAPI.reactivate(id); flash('Agent réactivé'); loadUsers() }
+        catch (err) { flash(err.response?.data?.error || 'Erreur', true) }
     }
 
-    const filteredUsers = users.filter(user => {
-        const matchesFilter = filter === 'all' ||
-            (filter === 'active' && user.is_active === 1) ||
-            (filter === 'inactive' && user.is_active === 0)
+    const counts = useMemo(() => ({
+        all:      users.length,
+        active:   users.filter(u => u.is_active === 1).length,
+        inactive: users.filter(u => u.is_active === 0).length,
+        admins:   users.filter(u => u.role === 'ADMIN' || u.role === 'SUPER_ADMIN').length,
+    }), [users])
 
-        const matchesSearch = user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            user.login?.toLowerCase().includes(searchTerm.toLowerCase())
-
-        return matchesFilter && matchesSearch
-    })
+    const filteredUsers = useMemo(() => {
+        const s = searchTerm.toLowerCase()
+        return users
+            .filter(u => filter === 'all' || (filter === 'active' ? u.is_active === 1 : u.is_active === 0))
+            .filter(u => !s || u.name?.toLowerCase().includes(s) || u.email?.toLowerCase().includes(s) || u.login?.toLowerCase().includes(s))
+    }, [users, searchTerm, filter])
 
     if (loading) return (
-        <div className="view-loading">
-            <div className="spinner"></div>
-            <style>{`
-                .view-loading { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: var(--bg); }
-                .spinner { width: 40px; height: 40px; border: 3px solid var(--slate-200); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
-                @keyframes spin { to { transform: rotate(360deg); } }
-            `}</style>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+            <div style={{ width: 36, height: 36, border: '3px solid #e5e7eb', borderTopColor: '#0891b2', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
-    );
+    )
 
     return (
-        <div className="users-wrapper">
-            <style>{`
-                .users-wrapper { min-height: 100vh; background: var(--bg); padding: 2.5rem; }
-                .users-container { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 2rem; }
-                
-                .view-header { display: flex; justify-content: space-between; align-items: flex-end; }
-                .title-area h1 { font-size: 1.75rem; font-weight: 800; color: var(--slate-900); display: flex; align-items: center; gap: 0.75rem; margin: 0; letter-spacing: -0.02em; }
-                .title-area p { font-size: 0.875rem; color: var(--slate-500); margin: 0.25rem 0 0 0; font-weight: 500; }
-                
-                .action-btn { 
-                    padding: 0.75rem 1.5rem; 
-                    background: var(--primary); 
-                    color: white; 
-                    border-radius: var(--radius-md); 
-                    font-weight: 700; 
-                    font-size: 0.875rem; 
-                    border: none; 
-                    cursor: pointer; 
-                    display: flex; 
-                    align-items: center; 
-                    gap: 0.625rem; 
-                    box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2); 
-                    transition: all 0.2s; 
-                }
-                .action-btn:hover { background: var(--primary-hover); transform: translateY(-2px); box-shadow: 0 6px 12px -2px rgba(79, 70, 229, 0.3); }
+        <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
 
-                .filter-card { background: white; border-radius: var(--radius-lg); border: 1px solid var(--border); padding: 1rem 1.5rem; box-shadow: var(--shadow-sm); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
-                .filter-tabs { display: flex; background: var(--slate-50); padding: 0.25rem; border-radius: 0.75rem; border: 1px solid var(--border-light); }
-                .filter-tab { padding: 0.5rem 1.25rem; border-radius: 0.5rem; font-size: 0.8125rem; font-weight: 700; color: var(--slate-500); cursor: pointer; border: none; background: transparent; transition: all 0.2s; }
-                .filter-tab.active { background: white; color: var(--primary); box-shadow: var(--shadow-sm); }
-                
-                .search-box { position: relative; flex: 1; max-width: 320px; }
-                .search-icon { position: absolute; left: 0.875rem; top: 50%; transform: translateY(-50%); color: var(--slate-400); width: 1rem; height: 1rem; }
-                .search-input { width: 100%; padding: 0.625rem 1rem 0.625rem 2.25rem; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 0.8125rem; outline: none; }
-                .search-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+            {/* ── HERO HEADER ── */}
+            <div style={{
+                background: 'linear-gradient(135deg, #164e63 0%, #0e7490 45%, #0891b2 100%)',
+                padding: '2.5rem 2.5rem 4rem',
+                position: 'relative', overflow: 'hidden',
+            }}>
+                <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '220px', height: '220px', borderRadius: '50%', background: 'rgba(255,255,255,.04)' }} />
+                <div style={{ position: 'absolute', bottom: '-60px', right: '15%', width: '160px', height: '160px', borderRadius: '50%', background: 'rgba(255,255,255,.03)' }} />
+                <div style={{ position: 'absolute', top: '20px', left: '40%', width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(255,255,255,.05)' }} />
 
-                .table-container { background: white; border-radius: var(--radius-xl); border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; }
-                .premium-table { width: 100%; border-collapse: collapse; }
-                .premium-table th { background: var(--slate-50); padding: 1.25rem 1.5rem; text-align: left; font-size: 0.75rem; font-weight: 800; color: var(--slate-400); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border-light); }
-                .premium-table td { padding: 1.25rem 1.5rem; font-size: 0.875rem; color: var(--slate-600); border-bottom: 1px solid var(--border-light); }
-                .premium-table tr:last-child td { border-bottom: none; }
-                .premium-table tr:hover td { background: var(--slate-50); }
-                
-                .user-info { display: flex; align-items: center; gap: 1rem; }
-                .user-avatar { width: 2.5rem; height: 2.5rem; border-radius: 50%; background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.875rem; border: 2px solid white; box-shadow: 0 0 0 1px var(--primary); }
-                .user-name { font-weight: 800; color: var(--slate-900); display: block; }
-                .user-email { font-size: 0.75rem; color: var(--slate-400); }
-
-                .role-badge { padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.625rem; font-weight: 800; text-transform: uppercase; display: flex; align-items: center; gap: 0.375rem; width: fit-content; }
-                .role-admin { background: #fee2e2; color: #991b1b; }
-                .role-editor { background: #eef2ff; color: #3730a3; }
-                .role-user { background: #f1f5f9; color: #475569; }
-
-                .status-indicator { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; font-weight: 700; }
-                .status-dot { width: 8px; height: 8px; border-radius: 50%; }
-                .status-active { color: var(--success); }
-                .status-active .status-dot { background: var(--success); box-shadow: 0 0 0 3px #d1fae5; }
-                .status-inactive { color: var(--danger); }
-                .status-inactive .status-dot { background: var(--danger); box-shadow: 0 0 0 3px #fee2e2; }
-
-                .actions-cell { display: flex; justify-content: flex-end; gap: 0.5rem; }
-                .action-btn-mini { padding: 0.5rem; border-radius: 0.5rem; border: 1px solid var(--border); background: white; color: var(--slate-400); cursor: pointer; transition: all 0.2s; }
-                .action-btn-mini:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
-                .action-btn-mini.danger:hover { border-color: var(--danger); color: var(--danger); background: #fef2f2; }
-                .action-btn-mini.success:hover { border-color: var(--success); color: var(--success); background: #ecfdf5; }
-
-                .alert { padding: 1rem 1.5rem; border-radius: var(--radius-md); font-size: 0.875rem; font-weight: 600; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem; }
-                .alert-error { background: #fef2f2; color: var(--danger); border: 1px solid #fee2e2; }
-                .alert-success { background: #ecfdf5; color: var(--success); border: 1px solid #d1fae5; }
-            `}</style>
-
-            <div className="users-container">
-                <header className="view-header">
-                    <div className="title-area">
-                        <button className="back-btn" onClick={() => navigate('/dashboard')} style={{ background: 'none', border: 'none', color: 'var(--slate-500)', fontSize: '0.875rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.5rem', cursor: 'pointer' }}>
-                            <ChevronLeft size={14} /> Tableau de bord
-                        </button>
-                        <h1>
-                            <Users size={32} color="var(--primary)" />
-                            Gestion des Agents
-                        </h1>
-                        <p>Contrôlez les accès et les rôles de votre équipe.</p>
+                <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative' }}>
+                    <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                            <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(255,255,255,.15)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <UserCog size={22} color="white" />
+                            </div>
+                            <h1 style={{ fontSize: '1.875rem', fontWeight: 800, color: 'white', margin: 0, letterSpacing: '-.03em' }}>
+                                Gestion des Agents
+                            </h1>
+                        </div>
+                        <p style={{ color: 'rgba(255,255,255,.6)', fontSize: '14px', margin: 0, marginLeft: '56px' }}>
+                            Contrôlez les accès et les rôles de votre équipe
+                        </p>
                     </div>
-                    <button onClick={() => navigate('/users/new')} className="action-btn">
-                        <UserPlus size={20} />
+
+                    <button
+                        onClick={() => navigate('/users/new')}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            padding: '12px 22px', borderRadius: '12px', border: 'none', cursor: 'pointer',
+                            background: 'white', color: '#0891b2',
+                            fontSize: '14px', fontWeight: 700,
+                            boxShadow: '0 4px 16px rgba(0,0,0,.2)',
+                            transition: 'all .2s',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,.25)' }}
+                        onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,.2)' }}
+                    >
+                        <UserPlus size={18} />
                         Créer un Agent
                     </button>
-                </header>
+                </div>
+            </div>
 
-                {error && <div className="alert alert-error"><Info size={16} />{error}</div>}
-                {success && <div className="alert alert-success"><CheckCircle2 size={16} />{success}</div>}
+            {/* ── CONTENU ── */}
+            <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 2.5rem 3rem', marginTop: '-2rem' }}>
 
-                <div className="filter-card">
-                    <div className="filter-tabs">
-                        <button className={`filter-tab ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>Tous ({users.length})</button>
-                        <button className={`filter-tab ${filter === 'active' ? 'active' : ''}`} onClick={() => setFilter('active')}>Actifs ({users.filter(u => u.is_active === 1).length})</button>
-                        <button className={`filter-tab ${filter === 'inactive' ? 'active' : ''}`} onClick={() => setFilter('inactive')}>Inactifs ({users.filter(u => u.is_active === 0).length})</button>
-                    </div>
+                {/* Card flottante stats + recherche */}
+                <div style={{
+                    background: 'white', borderRadius: '20px',
+                    border: '1px solid #e5e7eb',
+                    boxShadow: '0 8px 32px rgba(0,0,0,.08)',
+                    padding: '20px 24px', marginBottom: '28px',
+                    display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap',
+                }}>
+                    <StatPill icon={<Users size={20} />}      label="Total agents"  value={counts.all}     color="#0891b2" />
+                    <StatPill icon={<CheckCircle2 size={20} />} label="Actifs"       value={counts.active}  color="#16a34a" />
+                    <StatPill icon={<ShieldAlert size={20} />}  label="Admins"       value={counts.admins}  color="#d97706" />
 
-                    <div className="search-box">
-                        <Search className="search-icon" />
+                    <div style={{ width: '1px', height: '40px', background: '#f3f4f6', flexShrink: 0 }} />
+
+                    <div style={{ flex: 1, minWidth: '240px', position: 'relative' }}>
+                        <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#d1d5db' }} />
                         <input
                             type="text"
-                            className="search-input"
-                            placeholder="Rechercher par nom, CP, email..."
+                            placeholder="Rechercher par nom, login, email..."
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            style={{
+                                width: '100%', boxSizing: 'border-box',
+                                padding: '10px 36px 10px 38px',
+                                border: '1.5px solid #e5e7eb', borderRadius: '10px',
+                                fontSize: '14px', outline: 'none',
+                                background: '#f9fafb', transition: 'border-color .15s',
+                            }}
+                            onFocus={e => e.target.style.borderColor = '#0891b2'}
+                            onBlur={e => e.target.style.borderColor = '#e5e7eb'}
                         />
+                        {searchTerm && (
+                            <button onClick={() => setSearchTerm('')} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', display: 'flex' }}>
+                                <X size={14} />
+                            </button>
+                        )}
                     </div>
                 </div>
 
-                <div className="table-container">
-                    <table className="premium-table">
+                {/* Filtres */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
+                    <FilterChip label="Tous"     active={filter === 'all'}      onClick={() => setFilter('all')}      count={counts.all} />
+                    <FilterChip label="Actifs"   active={filter === 'active'}   onClick={() => setFilter('active')}   count={counts.active} />
+                    <FilterChip label="Inactifs" active={filter === 'inactive'} onClick={() => setFilter('inactive')} count={counts.inactive} />
+
+                    {filteredUsers.length !== users.length && (
+                        <span style={{ marginLeft: 'auto', fontSize: '13px', color: '#9ca3af', fontWeight: 600 }}>
+                            {filteredUsers.length} résultat{filteredUsers.length > 1 ? 's' : ''}
+                        </span>
+                    )}
+                </div>
+
+                {/* Alertes */}
+                {error && (
+                    <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: '12px', padding: '12px 18px', color: '#be123c', fontWeight: 600, marginBottom: '20px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Info size={15} /> {error}
+                    </div>
+                )}
+                {success && (
+                    <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '12px 18px', color: '#15803d', fontWeight: 600, marginBottom: '20px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <CheckCircle2 size={15} /> {success}
+                    </div>
+                )}
+
+                {/* Table */}
+                <div style={{ background: 'white', borderRadius: '20px', border: '1px solid #e5e7eb', boxShadow: '0 4px 16px rgba(0,0,0,.06)', overflow: 'hidden' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
-                            <tr>
-                                <th>Agent / Identité</th>
-                                <th>Login / CP</th>
-                                <th>Service / Groupe</th>
-                                <th>Niveau d'accès</th>
-                                <th>Statut</th>
-                                <th style={{ textAlign: 'right' }}>Options</th>
+                            <tr style={{ background: '#f8fafc', borderBottom: '2px solid #f1f5f9' }}>
+                                {['Agent / Identité', 'Login / CP', 'Service / Groupe', "Niveau d'accès", 'Statut', 'Options'].map((h, i) => (
+                                    <th key={h} style={{
+                                        padding: '14px 20px', textAlign: i === 5 ? 'right' : 'left',
+                                        fontSize: '11px', fontWeight: 700, color: '#94a3b8',
+                                        textTransform: 'uppercase', letterSpacing: '.06em',
+                                    }}>{h}</th>
+                                ))}
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredUsers.map(user => (
-                                <tr key={user.id}>
-                                    <td>
-                                        <div className="user-info">
-                                            <div className="user-avatar" style={{ opacity: user.is_active ? 1 : 0.5 }}>
-                                                {user.name?.charAt(0).toUpperCase()}
+                            {filteredUsers.map(user => {
+                                const av = avatarColor(user.name || '')
+                                const rc = roleConf(user.role)
+                                const isHov = hoveredRow === user.id
+                                const inactive = !user.is_active
+
+                                return (
+                                    <tr
+                                        key={user.id}
+                                        onMouseEnter={() => setHoveredRow(user.id)}
+                                        onMouseLeave={() => setHoveredRow(null)}
+                                        style={{
+                                            borderBottom: '1px solid #f1f5f9',
+                                            background: isHov ? '#f8fafc' : 'white',
+                                            opacity: inactive ? 0.6 : 1,
+                                            transition: 'background .15s',
+                                        }}
+                                    >
+                                        {/* Agent / Identité */}
+                                        <td style={{ padding: '16px 20px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                <div style={{
+                                                    width: '40px', height: '40px', borderRadius: '10px',
+                                                    background: av.bg, color: av.text,
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    fontSize: '14px', fontWeight: 800, flexShrink: 0,
+                                                    border: `1.5px solid ${av.text}22`,
+                                                }}>
+                                                    {initials(user.name || '')}
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontWeight: 700, fontSize: '14px', color: '#111827' }}>{user.name}</div>
+                                                    <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '1px' }}>{user.email}</div>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <span className="user-name" style={{ opacity: user.is_active ? 1 : 0.6 }}>{user.name}</span>
-                                                <span className="user-email">{user.email}</span>
+                                        </td>
+
+                                        {/* Login / CP */}
+                                        <td style={{ padding: '16px 20px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                                                <Key size={13} style={{ color: '#d1d5db', flexShrink: 0 }} />
+                                                <span style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '13px', color: '#374151' }}>{user.login}</span>
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <Key size={14} color="var(--slate-300)" />
-                                            <span style={{ fontFamily: 'JetBrains Mono', fontWeight: 600, fontSize: '0.8125rem' }}>{user.login}</span>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <Layers size={14} color="var(--slate-300)" />
-                                            <span>{user.group_name || 'Non affecté'}</span>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div className={`role-badge ${user.role === 'ADMIN' ? 'role-admin' : user.role === 'EDITOR' ? 'role-editor' : 'role-user'}`}>
-                                            <Shield size={10} />
-                                            {user.role}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div className={`status-indicator ${user.is_active ? 'status-active' : 'status-inactive'}`}>
-                                            <div className="status-dot"></div>
-                                            {user.is_active ? 'Actif' : 'Désactivé'}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div className="actions-cell">
-                                            <button className="action-btn-mini" onClick={() => navigate(`/users/${user.id}`)} title="Modifier">
-                                                <Edit size={16} />
-                                            </button>
-                                            {user.is_active ? (
-                                                <button className="action-btn-mini danger" onClick={() => handleDeactivate(user.id)} title="Désactiver">
-                                                    <UserMinus size={16} />
+                                        </td>
+
+                                        {/* Service / Groupe */}
+                                        <td style={{ padding: '16px 20px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                                                <Layers size={13} style={{ color: '#d1d5db', flexShrink: 0 }} />
+                                                <span style={{ fontSize: '13px', color: user.group_name ? '#374151' : '#9ca3af', fontStyle: user.group_name ? 'normal' : 'italic' }}>
+                                                    {user.group_name || 'Non affecté'}
+                                                </span>
+                                            </div>
+                                        </td>
+
+                                        {/* Niveau d'accès */}
+                                        <td style={{ padding: '16px 20px' }}>
+                                            <span style={{
+                                                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                                                padding: '4px 10px', borderRadius: '99px',
+                                                fontSize: '11px', fontWeight: 700,
+                                                background: rc.bg, color: rc.color,
+                                            }}>
+                                                {rc.icon} {rc.label}
+                                            </span>
+                                        </td>
+
+                                        {/* Statut */}
+                                        <td style={{ padding: '16px 20px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                                                <div style={{
+                                                    width: '8px', height: '8px', borderRadius: '50%',
+                                                    background: user.is_active ? '#22c55e' : '#ef4444',
+                                                    boxShadow: user.is_active ? '0 0 0 3px #dcfce7' : '0 0 0 3px #fee2e2',
+                                                }} />
+                                                <span style={{ fontSize: '13px', fontWeight: 700, color: user.is_active ? '#16a34a' : '#dc2626' }}>
+                                                    {user.is_active ? 'Actif' : 'Désactivé'}
+                                                </span>
+                                            </div>
+                                        </td>
+
+                                        {/* Options */}
+                                        <td style={{ padding: '16px 20px' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+                                                <button
+                                                    onClick={() => navigate(`/users/${user.id}`)}
+                                                    title="Modifier"
+                                                    style={{
+                                                        width: '34px', height: '34px', borderRadius: '8px', border: '1.5px solid #e5e7eb',
+                                                        background: isHov ? '#eff6ff' : 'white', color: isHov ? '#2563eb' : '#9ca3af',
+                                                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        transition: 'all .15s',
+                                                    }}
+                                                    onMouseEnter={e => { e.currentTarget.style.background='#eff6ff'; e.currentTarget.style.color='#2563eb'; e.currentTarget.style.borderColor='#bfdbfe' }}
+                                                    onMouseLeave={e => { e.currentTarget.style.background= isHov?'#eff6ff':'white'; e.currentTarget.style.color= isHov?'#2563eb':'#9ca3af'; e.currentTarget.style.borderColor='#e5e7eb' }}
+                                                >
+                                                    <Edit2 size={15} />
                                                 </button>
-                                            ) : (
-                                                <button className="action-btn-mini success" onClick={() => handleReactivate(user.id)} title="Réactiver">
-                                                    <UserCheck size={16} />
-                                                </button>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+
+                                                {user.is_active ? (
+                                                    <button
+                                                        onClick={() => handleDeactivate(user.id)}
+                                                        title="Désactiver"
+                                                        style={{
+                                                            width: '34px', height: '34px', borderRadius: '8px', border: '1.5px solid #e5e7eb',
+                                                            background: 'white', color: '#9ca3af', cursor: 'pointer',
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s',
+                                                        }}
+                                                        onMouseEnter={e => { e.currentTarget.style.background='#fff1f2'; e.currentTarget.style.color='#e11d48'; e.currentTarget.style.borderColor='#fecdd3' }}
+                                                        onMouseLeave={e => { e.currentTarget.style.background='white'; e.currentTarget.style.color='#9ca3af'; e.currentTarget.style.borderColor='#e5e7eb' }}
+                                                    >
+                                                        <UserMinus size={15} />
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => handleReactivate(user.id)}
+                                                        title="Réactiver"
+                                                        style={{
+                                                            width: '34px', height: '34px', borderRadius: '8px', border: '1.5px solid #e5e7eb',
+                                                            background: 'white', color: '#9ca3af', cursor: 'pointer',
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s',
+                                                        }}
+                                                        onMouseEnter={e => { e.currentTarget.style.background='#f0fdf4'; e.currentTarget.style.color='#16a34a'; e.currentTarget.style.borderColor='#bbf7d0' }}
+                                                        onMouseLeave={e => { e.currentTarget.style.background='white'; e.currentTarget.style.color='#9ca3af'; e.currentTarget.style.borderColor='#e5e7eb' }}
+                                                    >
+                                                        <UserCheck size={15} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )
+                            })}
+
                             {filteredUsers.length === 0 && (
                                 <tr>
-                                    <td colSpan="6" style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--slate-400)', fontWeight: 600 }}>
-                                        <Info size={40} style={{ opacity: 0.1, marginBottom: '1rem' }} />
-                                        <p>Aucun agent trouvé pour les critères sélectionnés.</p>
+                                    <td colSpan={6} style={{ padding: '64px 40px', textAlign: 'center' }}>
+                                        <div style={{ width: '60px', height: '60px', borderRadius: '16px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                                            <Users size={28} style={{ color: '#d1d5db' }} />
+                                        </div>
+                                        <div style={{ fontSize: '16px', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
+                                            {searchTerm ? 'Aucun résultat' : 'Aucun agent'}
+                                        </div>
+                                        <p style={{ fontSize: '14px', color: '#9ca3af', margin: 0 }}>
+                                            {searchTerm ? `Aucun agent ne correspond à "${searchTerm}"` : 'Commencez par créer votre premier agent'}
+                                        </p>
                                     </td>
                                 </tr>
                             )}

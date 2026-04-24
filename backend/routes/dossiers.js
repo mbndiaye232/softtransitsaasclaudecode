@@ -66,6 +66,7 @@ router.get('/', checkPermission('DOSSIERS', 'can_view'), async (req, res) => {
                 d.EtapeCotation as quotationStep, 
                 d.SaisiLe as createdAt,
                 CASE WHEN d.IdEtapeDossiers = 7 THEN 'CLOSED' ELSE 'OPEN' END as status,
+                EXISTS(SELECT 1 FROM factures f WHERE f.IDDossiers = d.IDDossiers) as isBilled,
                 s.NomSociete as company_name
             FROM dossiers d
             JOIN structur s ON d.structur_id = s.IDSociete
@@ -89,6 +90,34 @@ router.get('/', checkPermission('DOSSIERS', 'can_view'), async (req, res) => {
 });
 
 /**
+ * GET /api/dossiers/client/:clientId
+ * List dossiers for a specific client
+ */
+router.get('/client/:clientId', checkPermission('DOSSIERS', 'can_view'), async (req, res) => {
+    console.log(`DEBUG: Fetching dossiers for client ${req.params.clientId}, structur_id: ${req.structur_id}`);
+    try {
+        let query = `
+            SELECT d.IDDossiers as id, d.CodeDossier as code, d.Libelle as label,
+                   EXISTS(SELECT 1 FROM factures f WHERE f.IDDossiers = d.IDDossiers) as isBilled
+            FROM dossiers d
+            WHERE d.IDCLIENTS = ?
+        `;
+        let params = [req.params.clientId];
+
+        if (!req.user.is_provider) {
+            query += ' AND d.structur_id = ?';
+            params.push(req.structur_id);
+        }
+
+        const [rows] = await pool.query(query, params);
+        res.json(rows);
+    } catch (err) {
+        console.error('Get dossiers by client error:', err);
+        res.status(500).json({ error: 'Failed to fetch dossiers for client' });
+    }
+});
+
+/**
  * POST /api/dossiers
  * Create a new dossier
  */
@@ -98,16 +127,38 @@ router.post('/', checkPermission('DOSSIERS', 'can_create'), upload.single('file'
         return res.status(400).json({ errors: errors.array() });
     }
 
-    const { label, nature, mode, type, description, clientId, dpiNumber, quotationStep, contactName, contactPhone, contactEmail, observations } = req.body;
+    const { label, nature, mode, type, description, clientId, dpiNumber, quotationStep, contactName, contactPhone, contactEmail, observations, dateRemiseDocs } = req.body;
 
     if (!clientId) {
         return res.status(400).json({ error: 'Veuillez sélectionner un client' });
     }
 
-    const fileUrl = req.file ? `/uploads/dossiers/${req.file.filename}` : null;
+    let fileUrl = req.file ? `/uploads/dossiers/${req.file.filename}` : null;
     const year = new Date().getFullYear();
 
     try {
+        // Move file dynamically to client folder
+        if (req.file && clientId) {
+            const [clientRows] = await pool.query('SELECT NomRS FROM clients WHERE IDCLIENTS = ?', [clientId]);
+            let clientNameSafe = 'unknown';
+            if (clientRows.length > 0) {
+                clientNameSafe = (clientRows[0].NomRS || 'unknown').replace(/[^a-zA-Z0-9]/g, '_');
+            }
+
+            const fs = require('fs');
+            const path = require('path');
+            const dynamicOutputDir = path.join(__dirname, '..', 'uploads', 'clients', `${clientId}_${clientNameSafe}`, 'dossiers');
+
+            if (!fs.existsSync(dynamicOutputDir)) {
+                fs.mkdirSync(dynamicOutputDir, { recursive: true });
+            }
+
+            const newPath = path.join(dynamicOutputDir, req.file.filename);
+            fs.renameSync(req.file.path, newPath);
+
+            fileUrl = `/uploads/clients/${clientId}_${clientNameSafe}/dossiers/${req.file.filename}`;
+        }
+
         // Determine next increment
         const [rows] = await pool.query(
             `SELECT MAX(CAST(SUBSTRING_INDEX(CodeDossier, '-', -1) AS UNSIGNED)) as maxInc 
@@ -126,13 +177,13 @@ router.post('/', checkPermission('DOSSIERS', 'can_create'), upload.single('file'
                 IDCLIENTS, Libelle, CodeDossier, CodeDossierCourt, NatureDossier, ModeExpedition, TypeDossier,
                 Typedocument, DescriptionDossiers, NumeroDPI, EtapeCotation, PersonneContact, 
                 TelPersonneContact, EmailPersonneContact, Observations, cheminfiche, IdAgentValidation,
-                Facturable, SaisiLe, IdEtapeDossiers, structur_id, IdAgentSaisi, IdAgModiff
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NOW(), 1, ?, ?, ?)`,
+                Facturable, SaisiLe, IdEtapeDossiers, structur_id, IdAgentSaisi, IdAgModiff, DateRemise
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NOW(), 1, ?, ?, ?, ?)`,
             [
                 clientId || null, label, code, shortCode, nature, mode, type,
                 documentType, description || null, dpiNumber || null, quotationStep ? 1 : 0,
                 contactName || null, contactPhone || null, contactEmail || null, observations || null,
-                fileUrl, req.user.id, req.structur_id, req.user.id, req.user.id
+                fileUrl, req.user.id, req.structur_id, req.user.id, req.user.id, dateRemiseDocs || null
             ]
         );
 
@@ -161,14 +212,17 @@ router.post('/', checkPermission('DOSSIERS', 'can_create'), upload.single('file'
 router.get('/:id', checkPermission('DOSSIERS', 'can_view'), async (req, res) => {
     try {
         let query = `
-            SELECT IDDossiers as id, IDCLIENTS as clientId, Libelle as label, CodeDossier as code, 
-                    CodeDossierCourt as shortCode, NatureDossier as nature, ModeExpedition as mode, 
-                    TypeDossier as type, Typedocument as documentType, DescriptionDossiers as description,
-                    NumeroDPI as dpiNumber, EtapeCotation as quotationStep, PersonneContact as contactName,
-                    TelPersonneContact as contactPhone, EmailPersonneContact as contactEmail,
-                    Observations as observations, cheminfiche as fileUrl, IdAgentValidation as validatedByAgentId,
-                    Facturable as isFacturable, SaisiLe as createdAt
-             FROM dossiers WHERE IDDossiers = ?
+            SELECT d.IDDossiers as id, d.IDCLIENTS as clientId, c.NomRS as clientName, c.NomRS as NomClient,
+                    d.Libelle as label, d.CodeDossier as code, 
+                    d.CodeDossierCourt as shortCode, d.NatureDossier as nature, d.ModeExpedition as mode, 
+                    d.TypeDossier as type, d.Typedocument as documentType, d.DescriptionDossiers as description,
+                    d.NumeroDPI as dpiNumber, d.EtapeCotation as quotationStep, d.PersonneContact as contactName,
+                    d.TelPersonneContact as contactPhone, d.EmailPersonneContact as contactEmail,
+                    d.observations as observations, d.cheminfiche as fileUrl, d.IdAgentValidation as validatedByAgentId,
+                    d.Facturable as isFacturable, d.SaisiLe as createdAt, d.DateRemise as dateRemiseDocs
+             FROM dossiers d
+             LEFT JOIN CLIENTS c ON d.IDCLIENTS = c.IDCLIENTS
+             WHERE d.IDDossiers = ?
         `;
         let params = [req.params.id];
 
@@ -197,8 +251,8 @@ router.put('/:id', checkPermission('DOSSIERS', 'can_edit'), upload.single('file'
     if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
     }
-    const { label, nature, mode, type, description, editCode, isFacturable, clientId, dpiNumber, quotationStep, contactName, contactPhone, contactEmail, observations } = req.body;
-    const fileUrl = req.file ? `/uploads/dossiers/${req.file.filename}` : undefined;
+    const { label, nature, mode, type, description, editCode, isFacturable, clientId, dpiNumber, quotationStep, contactName, contactPhone, contactEmail, observations, dateRemiseDocs } = req.body;
+    let fileUrl = req.file ? `/uploads/dossiers/${req.file.filename}` : undefined;
 
     try {
         let query = `SELECT * FROM dossiers WHERE IDDossiers = ?`;
@@ -214,6 +268,29 @@ router.put('/:id', checkPermission('DOSSIERS', 'can_edit'), upload.single('file'
         }
 
         const dossier = exist[0];
+        const finalClientId = clientId || dossier.IDCLIENTS;
+
+        if (req.file && finalClientId) {
+            const [clientRows] = await pool.query('SELECT NomRS FROM clients WHERE IDCLIENTS = ?', [finalClientId]);
+            let clientNameSafe = 'unknown';
+            if (clientRows.length > 0) {
+                clientNameSafe = (clientRows[0].NomRS || 'unknown').replace(/[^a-zA-Z0-9]/g, '_');
+            }
+
+            const fs = require('fs');
+            const path = require('path');
+            const dynamicOutputDir = path.join(__dirname, '..', 'uploads', 'clients', `${finalClientId}_${clientNameSafe}`, 'dossiers');
+
+            if (!fs.existsSync(dynamicOutputDir)) {
+                fs.mkdirSync(dynamicOutputDir, { recursive: true });
+            }
+
+            const newPath = path.join(dynamicOutputDir, req.file.filename);
+            fs.renameSync(req.file.path, newPath);
+
+            fileUrl = `/uploads/clients/${finalClientId}_${clientNameSafe}/dossiers/${req.file.filename}`;
+        }
+
         let newCode = dossier.CodeDossier;
         let newShortCode = dossier.CodeDossierCourt;
         let newDocumentType = dossier.Typedocument;
@@ -226,8 +303,8 @@ router.put('/:id', checkPermission('DOSSIERS', 'can_edit'), upload.single('file'
             newDocumentType = getDocumentType(mode);
         }
 
-        let updateQuery = `UPDATE dossiers SET Libelle = ?, NatureDossier = ?, ModeExpedition = ?, TypeDossier = ?, DescriptionDossiers = ?, CodeDossier = ?, CodeDossierCourt = ?, Typedocument = ?, Facturable = ?, IDCLIENTS = ?, NumeroDPI = ?, EtapeCotation = ?, PersonneContact = ?, TelPersonneContact = ?, EmailPersonneContact = ?, Observations = ?, IdAgModiff = ?`;
-        let updateParams = [label, nature, mode, type, description || null, newCode, newShortCode, newDocumentType, isFacturable ? 1 : 0, clientId || null, dpiNumber || null, quotationStep ? 1 : 0, contactName || null, contactPhone || null, contactEmail || null, observations || null, req.user.id];
+        let updateQuery = `UPDATE dossiers SET Libelle = ?, NatureDossier = ?, ModeExpedition = ?, TypeDossier = ?, DescriptionDossiers = ?, CodeDossier = ?, CodeDossierCourt = ?, Typedocument = ?, Facturable = ?, IDCLIENTS = ?, NumeroDPI = ?, EtapeCotation = ?, PersonneContact = ?, TelPersonneContact = ?, EmailPersonneContact = ?, Observations = ?, IdAgModiff = ?, DateRemise = ?`;
+        let updateParams = [label, nature, mode, type, description || null, newCode, newShortCode, newDocumentType, isFacturable ? 1 : 0, clientId || null, dpiNumber || null, quotationStep ? 1 : 0, contactName || null, contactPhone || null, contactEmail || null, observations || null, req.user.id, dateRemiseDocs || null];
 
         if (fileUrl) {
             updateQuery += `, cheminfiche = ?`;
@@ -295,6 +372,57 @@ router.delete('/:id', checkPermission('DOSSIERS', 'can_delete'), async (req, res
     } catch (err) {
         console.error('Delete dossier error:', err);
         res.status(500).json({ error: 'Failed to delete dossier' });
+    }
+});
+
+/**
+ * GET /api/dossiers/:id/taxes-liquidees
+ * Returns the aggregated taxes for a dossier if ALL its notes de details are validated.
+ */
+router.get('/:id/taxes-liquidees', checkPermission('DOSSIERS', 'can_view'), async (req, res) => {
+    try {
+        const dossierId = req.params.id;
+
+        // Check ownership
+        let checkQuery = 'SELECT IDDossiers FROM dossiers WHERE IDDossiers = ?';
+        let checkParams = [dossierId];
+        if (!req.user.is_provider) {
+            checkQuery += ' AND structur_id = ?';
+            checkParams.push(req.structur_id);
+        }
+        const [dexist] = await pool.query(checkQuery, checkParams);
+        if (dexist.length === 0) return res.status(404).json({ error: 'Dossier not found' });
+
+        // Retrieve notes for dossier
+        const [notes] = await pool.query('SELECT IDNotesDeDetails, Valide FROM notesdedetails WHERE IDDossiers = ?', [dossierId]);
+        if (notes.length === 0) {
+            return res.status(400).json({ error: "Il n'existe pas de note de détail pour ce dossier. Impossible de récupérer les taxes." });
+        }
+
+        // Check if all are validated (Valide == 1)
+        const unvalidated = notes.filter(n => n.Valide !== 1);
+        if (unvalidated.length > 0) {
+            return res.status(400).json({ error: "Toutes les notes de détail du dossier ne sont pas validées. Impossible de récupérer les taxes." });
+        }
+
+        // Aggregate taxes
+        const [taxes] = await pool.query(`
+            SELECT 
+                la.CodeTaxe, 
+                MAX(la.LibelleTaxe) as LibelleTaxeComplet, 
+                SUM(la.Montant) as la_somme_MontantLiquide
+            FROM liquidations_articles la
+            JOIN articles a ON la.IDArticles = a.IDArticles
+            JOIN notesdedetails n ON a.IDNotesDeDetails = n.IDNotesDeDetails
+            WHERE n.IDDossiers = ?
+            GROUP BY la.CodeTaxe
+            ORDER BY la.CodeTaxe
+        `, [dossierId]);
+
+        res.json(taxes);
+    } catch (err) {
+        console.error('Error fetching taxes for dossier:', err);
+        res.status(500).json({ error: 'Failed to fetch liquidations' });
     }
 });
 

@@ -88,4 +88,43 @@ router.get('/:nts', checkPermission('PRODUITS', 'can_view'), async (req, res) =>
     }
 });
 
+// POST /api/produits - Create a new product
+router.post('/', checkPermission('PRODUITS', 'can_create'), async (req, res) => {
+    try {
+        const { NTS, Libelle } = req.body;
+        if (!NTS || !Libelle) {
+            return res.status(400).json({ error: 'NTS et Libelle sont obligatoires' });
+        }
+
+        // Check if NTS already exists
+        const [existing] = await pool.query('SELECT IDProduits FROM produits WHERE NTS = ?', [NTS]);
+        if (existing.length > 0) {
+            return res.status(409).json({ error: `Le code NTS ${NTS} existe déjà` });
+        }
+
+        const [result] = await pool.query(
+            'INSERT INTO produits (NTS, Libelle, IDAgents) VALUES (?, ?, ?)',
+            [NTS, Libelle, req.user.id]
+        );
+        res.status(201).json({ message: 'Produit créé avec succès', id: result.insertId, NTS, Libelle });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// DELETE /api/produits/:nts - Delete product by NTS
+router.delete('/:nts', checkPermission('PRODUITS', 'can_delete'), async (req, res) => {
+    try {
+        const [result] = await pool.query('DELETE FROM produits WHERE NTS = ?', [req.params.nts]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Produit introuvable' });
+        }
+        res.json({ message: 'Produit supprimé avec succès' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 module.exports = router;

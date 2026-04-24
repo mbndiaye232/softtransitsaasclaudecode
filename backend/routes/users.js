@@ -1,13 +1,42 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
-const { authMiddleware, tenantMiddleware, requireRole, checkPermission } = require('../middleware/auth');
+const { authMiddleware, tenantMiddleware, requireRole, requireSuperAdmin, checkPermission } = require('../middleware/auth');
 const { hashPassword, validateEmail, validatePassword } = require('../utils/auth');
 const auditService = require('../services/auditService');
 
 // Apply middleware to all routes
 router.use(authMiddleware);
 router.use(tenantMiddleware);
+
+/**
+ * GET /api/users/me/permissions
+ * Retourne les permissions de l'utilisateur connecté (pour le menu frontend)
+ */
+router.get('/me/permissions', async (req, res) => {
+    try {
+        // SUPER_ADMIN et ADMIN ont accès à tout
+        if (req.user.role === 'SUPER_ADMIN' || req.user.role === 'ADMIN') {
+            const [all] = await pool.query('SELECT code FROM permissions');
+            const fullAccess = all.map(p => ({
+                code: p.code, can_view: 1, can_create: 1, can_edit: 1, can_delete: 1
+            }));
+            return res.json({ role: req.user.role, fullAccess: true, permissions: fullAccess });
+        }
+        // Autres agents : on retourne leurs permissions réelles
+        const [rows] = await pool.query(
+            `SELECT p.code, ap.can_view, ap.can_create, ap.can_edit, ap.can_delete
+             FROM permissions p
+             LEFT JOIN agent_permissions ap ON ap.permission_id = p.id AND ap.agent_id = ?
+             ORDER BY p.name`,
+            [req.user.id]
+        );
+        res.json({ role: req.user.role, fullAccess: false, permissions: rows });
+    } catch (error) {
+        console.error('Get my permissions error:', error);
+        res.status(500).json({ error: 'Failed to fetch permissions' });
+    }
+});
 
 /**
  * GET /api/users/permissions/list
@@ -468,6 +497,53 @@ router.patch('/:id/reactivate', checkPermission('AGENTS', 'can_edit'), async (re
     } catch (error) {
         console.error('Reactivate user error:', error);
         res.status(500).json({ error: 'Failed to reactivate user' });
+    }
+});
+
+/**
+ * PUT /api/users/:id/super-admin
+ * Accorder ou révoquer le rôle SUPER_ADMIN (réservé aux SUPER_ADMIN)
+ */
+router.put('/:id/super-admin', requireSuperAdmin, async (req, res) => {
+    const { grant } = req.body; // true = accorder, false = révoquer
+    const targetId = req.params.id;
+
+    // Empêcher de se révoquer soi-même
+    if (String(targetId) === String(req.user.id) && !grant) {
+        return res.status(400).json({ error: 'Vous ne pouvez pas vous révoquer vous-même' });
+    }
+
+    try {
+        const [[target]] = await pool.query(
+            'SELECT IDAgents, NomAgent, role FROM Agents WHERE IDAgents = ?',
+            [targetId]
+        );
+        if (!target) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+
+        if (grant && target.role !== 'ADMIN' && target.role !== 'SUPER_ADMIN') {
+            return res.status(400).json({ error: 'Seul un ADMIN peut être promu SUPER_ADMIN' });
+        }
+
+        const newRole = grant ? 'SUPER_ADMIN' : 'ADMIN';
+        await pool.query('UPDATE Agents SET role = ? WHERE IDAgents = ?', [newRole, targetId]);
+
+        // Mettre is_provider sur la société si promotion
+        if (grant) {
+            await pool.query(
+                'UPDATE structur SET is_provider = 1 WHERE IDSociete = (SELECT structur_id FROM Agents WHERE IDAgents = ?)',
+                [targetId]
+            );
+        }
+
+        res.json({
+            message: grant
+                ? `${target.NomAgent} est maintenant SUPER_ADMIN`
+                : `${target.NomAgent} est repassé ADMIN`,
+            new_role: newRole
+        });
+    } catch (err) {
+        console.error('Super admin toggle error:', err);
+        res.status(500).json({ error: 'Erreur serveur' });
     }
 });
 

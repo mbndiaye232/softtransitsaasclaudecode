@@ -1,264 +1,369 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { dossiersAPI } from '../services/api';
+import React, { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { dossiersAPI } from '../services/api'
 import {
-    FileText,
-    Plus,
-    Search,
-    Edit,
-    Trash2,
-    ChevronRight,
-    Ship,
-    Plane,
-    Truck,
-    Info
-} from 'lucide-react';
+    FileText, Plus, Search, Edit2, Trash2, ChevronRight,
+    Ship, Plane, Truck, X, FolderOpen, ReceiptText, Clock, CheckCircle2
+} from 'lucide-react'
 
-const DossierList = () => {
-    const navigate = useNavigate();
-    const [dossiers, setDossiers] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [searchTerm, setSearchTerm] = useState('');
+/* ─── Helpers mode transport ─────────────────────────────────────────────── */
+const MODE_CONFIG = {
+    MA: { label: 'Maritime', icon: <Ship size={14} />,   bg: '#eff6ff', color: '#1d4ed8' },
+    AE: { label: 'Aérien',   icon: <Plane size={14} />,  bg: '#fdf4ff', color: '#7c3aed' },
+    TE: { label: 'Routier',  icon: <Truck size={14} />,  bg: '#fff7ed', color: '#c2410c' },
+}
+const modeConf = (m) => MODE_CONFIG[m] || { label: m || '—', icon: <FileText size={14} />, bg: '#f3f4f6', color: '#6b7280' }
 
-    useEffect(() => {
-        fetchDossiers();
-    }, []);
+/* ─── StatPill ───────────────────────────────────────────────────────────── */
+const StatPill = ({ icon, label, value, color, onClick, active }) => (
+    <div
+        onClick={onClick}
+        style={{
+            display: 'flex', alignItems: 'center', gap: '10px',
+            background: active ? color + '12' : 'white',
+            border: `1px solid ${active ? color : '#e5e7eb'}`,
+            borderRadius: '12px', padding: '12px 18px',
+            boxShadow: '0 1px 3px rgba(0,0,0,.06)', minWidth: 'fit-content',
+            cursor: onClick ? 'pointer' : 'default',
+            transition: 'all .15s',
+        }}
+    >
+        <span style={{ color, display: 'flex' }}>{icon}</span>
+        <div>
+            <div style={{ fontSize: '18px', fontWeight: 800, color: '#111827', lineHeight: 1 }}>{value}</div>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '.04em', marginTop: '2px' }}>{label}</div>
+        </div>
+    </div>
+)
+
+const FilterChip = ({ label, active, onClick, count }) => (
+    <button onClick={onClick} style={{
+        display: 'flex', alignItems: 'center', gap: '6px',
+        padding: '6px 14px', borderRadius: '99px', border: 'none', cursor: 'pointer',
+        fontSize: '13px', fontWeight: 600, transition: 'all .15s',
+        background: active ? '#111827' : '#f3f4f6',
+        color: active ? 'white' : '#6b7280',
+    }}>
+        {label}
+        {count !== undefined && (
+            <span style={{
+                fontSize: '11px', fontWeight: 700,
+                background: active ? 'rgba(255,255,255,.25)' : '#e5e7eb',
+                color: active ? 'white' : '#9ca3af',
+                borderRadius: '99px', padding: '1px 6px',
+            }}>{count}</span>
+        )}
+    </button>
+)
+
+/* ─── Page principale ────────────────────────────────────────────────────── */
+export default function DossierList() {
+    const navigate = useNavigate()
+    const [dossiers, setDossiers] = useState([])
+    const [loading, setLoading]   = useState(true)
+    const [error, setError]       = useState(null)
+    const [searchTerm, setSearchTerm]   = useState('')
+    const [filterBilled, setFilterBilled] = useState('all')
+    const [filterMode, setFilterMode]   = useState('all')
+    const [hoveredRow, setHoveredRow]   = useState(null)
+
+    useEffect(() => { fetchDossiers() }, [])
 
     const fetchDossiers = async () => {
         try {
-            setLoading(true);
-            const response = await dossiersAPI.getAll();
-            setDossiers(response.data);
-            setError(null);
-        } catch (err) {
-            console.error('Error fetching dossiers:', err);
-            setError('Impossible de charger les dossiers. Veuillez réessayer.');
+            setLoading(true)
+            const r = await dossiersAPI.getAll()
+            setDossiers(r.data)
+            setError(null)
+        } catch {
+            setError('Impossible de charger les dossiers.')
         } finally {
-            setLoading(false);
+            setLoading(false)
         }
-    };
+    }
 
     const handleDelete = async (e, id) => {
-        e.stopPropagation();
-        if (window.confirm('Êtes-vous sûr de vouloir supprimer ce dossier ?')) {
-            try {
-                await dossiersAPI.delete(id);
-                setDossiers(dossiers.filter(d => d.id !== id));
-            } catch (err) {
-                console.error('Error deleting dossier:', err);
-                alert('Erreur lors de la suppression du dossier');
-            }
+        e.stopPropagation()
+        if (window.confirm('Supprimer ce dossier ?')) {
+            try { await dossiersAPI.delete(id); setDossiers(d => d.filter(x => x.id !== id)) }
+            catch { alert('Erreur lors de la suppression') }
         }
-    };
+    }
 
-    const getModeIcon = (mode) => {
-        switch (mode) {
-            case 'MA': return <Ship size={14} />;
-            case 'AE': return <Plane size={14} />;
-            case 'TE': return <Truck size={14} />;
-            default: return <FileText size={14} />;
-        }
-    };
+    const counts = useMemo(() => ({
+        all:      dossiers.length,
+        enCours:  dossiers.filter(d => d.status !== 'CLOSED').length,
+        factures: dossiers.filter(d => d.isBilled).length,
+        nonFact:  dossiers.filter(d => !d.isBilled).length,
+    }), [dossiers])
 
-    const filteredDossiers = dossiers.filter(dossier =>
-        dossier.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        dossier.label?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        dossier.clientName?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredDossiers = useMemo(() => {
+        const s = searchTerm.toLowerCase()
+        return dossiers
+            .filter(d => filterBilled === 'all' || (filterBilled === 'billed' ? d.isBilled : !d.isBilled))
+            .filter(d => filterMode === 'all' || d.mode === filterMode)
+            .filter(d => !s || d.code?.toLowerCase().includes(s) || d.label?.toLowerCase().includes(s) || d.clientName?.toLowerCase().includes(s))
+    }, [dossiers, searchTerm, filterBilled, filterMode])
 
     if (loading) return (
-        <div className="view-loading">
-            <div className="spinner"></div>
-            <style>{`
-                .view-loading { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: var(--bg); }
-                .spinner { width: 40px; height: 40px; border: 3px solid var(--slate-200); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
-                @keyframes spin { to { transform: rotate(360deg); } }
-            `}</style>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+            <div style={{ width: 36, height: 36, border: '3px solid #e5e7eb', borderTopColor: '#f59e0b', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
-    );
+    )
 
     return (
-        <div className="page-wrapper">
-            <style>{`
-                .page-wrapper { min-height: 100vh; background: var(--bg); padding: 2.5rem; }
-                .page-container { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 2rem; }
-                
-                .view-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1rem; }
-                .title-area h1 { font-size: 1.75rem; font-weight: 800; color: var(--slate-900); display: flex; align-items: center; gap: 0.75rem; margin: 0; letter-spacing: -0.02em; }
-                .title-area p { font-size: 0.875rem; color: var(--slate-500); margin: 0.25rem 0 0 0; font-weight: 500; }
-                
-                .action-btn { 
-                    padding: 0.75rem 1.5rem; 
-                    background: var(--primary); 
-                    color: white; 
-                    border-radius: var(--radius-md); 
-                    font-weight: 700; 
-                    font-size: 0.875rem; 
-                    border: none; 
-                    cursor: pointer; 
-                    display: flex; 
-                    align-items: center; 
-                    gap: 0.625rem; 
-                    box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2); 
-                    transition: all 0.2s; 
-                }
-                .action-btn:hover { background: var(--primary-hover); transform: translateY(-2px); box-shadow: 0 6px 12px -2px rgba(79, 70, 229, 0.3); }
+        <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
 
-                .list-card { background: white; border-radius: var(--radius-xl); border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; }
-                .filter-bar { padding: 1.25rem 2rem; border-bottom: 1px solid var(--border-light); background: var(--surface-header); display: flex; justify-content: space-between; align-items: center; }
-                
-                .search-box { position: relative; width: 320px; }
-                .search-icon { position: absolute; left: 0.875rem; top: 50%; transform: translateY(-50%); color: var(--slate-400); width: 1.125rem; height: 1.125rem; }
-                .search-input { width: 100%; padding: 0.625rem 1rem 0.625rem 2.5rem; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 0.875rem; outline: none; transition: all 0.2s; }
-                .search-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
-                
-                .table-scroll { overflow-x: auto; }
-                table { width: 100%; border-collapse: collapse; }
-                th { text-align: left; padding: 1.25rem 1.5rem; background: var(--slate-50); font-size: 0.75rem; font-weight: 700; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
-                td { padding: 1.25rem 1.5rem; font-size: 0.875rem; border-bottom: 1px solid var(--slate-50); color: var(--slate-700); }
-                
-                .tr-row { transition: all 0.2s; cursor: pointer; }
-                .tr-row:hover { background: var(--slate-50); }
-                
-                .code-pill { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--primary); background: var(--primary-light); padding: 0.25rem 0.625rem; border-radius: var(--radius-sm); font-size: 0.8125rem; border: 1px solid color-mix(in srgb, var(--primary), transparent 85%); }
-                .client-name { font-weight: 700; color: var(--slate-900); }
-                .label-text { font-size: 0.8125rem; color: var(--slate-500); display: block; margin-top: 0.125rem; }
-                
-                .badge { padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 800; display: inline-flex; align-items: center; gap: 0.375rem; }
-                .badge-blue { background: #eff6ff; color: #1e40af; border: 1px solid #dbeafe; }
-                .badge-green { background: #f0fdf4; color: #166534; border: 1px solid #dcfce7; }
-                .badge-amber { background: #fffbeb; color: #92400e; border: 1px solid #fef3c7; }
-                
-                .mode-badge { display: flex; align-items: center; gap: 0.5rem; color: var(--slate-600); font-size: 0.8125rem; font-weight: 600; }
-                
-                .row-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
-                .icon-btn { padding: 0.5rem; border-radius: 0.5rem; border: none; background: transparent; color: var(--slate-400); cursor: pointer; transition: all 0.2s; }
-                .icon-btn:hover { background: var(--slate-100); color: var(--slate-900); }
-                .icon-btn.delete:hover { background: #fef2f2; color: var(--danger); }
-                
-                .empty-view { padding: 6rem 2rem; text-align: center; color: var(--slate-400); }
-            `}</style>
+            {/* ── HERO HEADER ── */}
+            <div style={{
+                background: 'linear-gradient(135deg, #78350f 0%, #b45309 45%, #f59e0b 100%)',
+                padding: '2.5rem 2.5rem 4rem',
+                position: 'relative', overflow: 'hidden',
+            }}>
+                <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '220px', height: '220px', borderRadius: '50%', background: 'rgba(255,255,255,.04)' }} />
+                <div style={{ position: 'absolute', bottom: '-60px', right: '15%', width: '160px', height: '160px', borderRadius: '50%', background: 'rgba(255,255,255,.03)' }} />
+                <div style={{ position: 'absolute', top: '20px', left: '40%', width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(255,255,255,.05)' }} />
 
-            <div className="page-container">
-                <header className="view-header">
-                    <div className="title-area">
-                        <h1>
-                            <FileText size={32} color="var(--primary)" />
-                            Gestion des Dossiers
-                        </h1>
-                        <p>Visualisez et gérez l'ensemble de vos opérations de transit.</p>
+                <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative' }}>
+                    <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                            <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(255,255,255,.15)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <FolderOpen size={22} color="white" />
+                            </div>
+                            <h1 style={{ fontSize: '1.875rem', fontWeight: 800, color: 'white', margin: 0, letterSpacing: '-.03em' }}>
+                                Gestion des Dossiers
+                            </h1>
+                        </div>
+                        <p style={{ color: 'rgba(255,255,255,.6)', fontSize: '14px', margin: 0, marginLeft: '56px' }}>
+                            Visualisez et gérez l'ensemble de vos opérations de transit
+                        </p>
                     </div>
-                    <button onClick={() => navigate('/dossiers/new')} className="action-btn">
-                        <Plus size={20} />
-                        Nouveau Dossier
+
+                    <button
+                        onClick={() => navigate('/dossiers/new')}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            padding: '12px 22px', borderRadius: '12px', border: 'none', cursor: 'pointer',
+                            background: 'white', color: '#b45309', fontSize: '14px', fontWeight: 700,
+                            boxShadow: '0 4px 16px rgba(0,0,0,.2)', transition: 'all .2s',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 8px 24px rgba(0,0,0,.25)' }}
+                        onMouseLeave={e => { e.currentTarget.style.transform='none'; e.currentTarget.style.boxShadow='0 4px 16px rgba(0,0,0,.2)' }}
+                    >
+                        <Plus size={18} /> Nouveau Dossier
                     </button>
-                </header>
+                </div>
+            </div>
+
+            {/* ── CONTENU ── */}
+            <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 2.5rem 3rem', marginTop: '-2rem' }}>
+
+                {/* Card flottante stats + recherche */}
+                <div style={{
+                    background: 'white', borderRadius: '20px', border: '1px solid #e5e7eb',
+                    boxShadow: '0 8px 32px rgba(0,0,0,.08)', padding: '20px 24px', marginBottom: '28px',
+                    display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap',
+                }}>
+                    <StatPill icon={<FolderOpen size={20} />} label="Total" value={counts.all} color="#f59e0b"
+                        active={filterBilled === 'all'} onClick={() => setFilterBilled('all')} />
+                    <StatPill icon={<Clock size={20} />} label="En cours" value={counts.enCours} color="#2563eb"
+                        active={false} />
+                    <StatPill icon={<ReceiptText size={20} />} label="Facturés" value={counts.factures} color="#16a34a"
+                        active={filterBilled === 'billed'} onClick={() => setFilterBilled('billed')} />
+                    <StatPill icon={<CheckCircle2 size={20} />} label="Non facturés" value={counts.nonFact} color="#ea580c"
+                        active={filterBilled === 'unbilled'} onClick={() => setFilterBilled('unbilled')} />
+
+                    <div style={{ width: '1px', height: '40px', background: '#f3f4f6', flexShrink: 0 }} />
+
+                    {/* Recherche */}
+                    <div style={{ flex: 1, minWidth: '220px', position: 'relative' }}>
+                        <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#d1d5db' }} />
+                        <input
+                            type="text" placeholder="Rechercher code, libellé, client..."
+                            value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '10px 36px 10px 38px', border: '1.5px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', outline: 'none', background: '#f9fafb', transition: 'border-color .15s' }}
+                            onFocus={e => e.target.style.borderColor='#f59e0b'}
+                            onBlur={e => e.target.style.borderColor='#e5e7eb'}
+                        />
+                        {searchTerm && (
+                            <button onClick={() => setSearchTerm('')} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', display: 'flex' }}>
+                                <X size={14} />
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Filtres mode transport */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
+                    <FilterChip label="Tous modes" active={filterMode === 'all'} onClick={() => setFilterMode('all')} count={dossiers.length} />
+                    {Object.entries(MODE_CONFIG).map(([k, v]) => (
+                        <FilterChip key={k} label={v.label} active={filterMode === k}
+                            onClick={() => setFilterMode(filterMode === k ? 'all' : k)}
+                            count={dossiers.filter(d => d.mode === k).length} />
+                    ))}
+                    {filteredDossiers.length !== dossiers.length && (
+                        <span style={{ marginLeft: 'auto', fontSize: '13px', color: '#9ca3af', fontWeight: 600 }}>
+                            {filteredDossiers.length} résultat{filteredDossiers.length > 1 ? 's' : ''}
+                        </span>
+                    )}
+                </div>
 
                 {error && (
-                    <div className="premium-card" style={{ padding: '1rem 2rem', color: 'var(--danger)', fontWeight: 600 }}>
+                    <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: '12px', padding: '12px 18px', color: '#be123c', fontWeight: 600, marginBottom: '20px', fontSize: '14px' }}>
                         {error}
                     </div>
                 )}
 
-                <div className="list-card">
-                    <div className="filter-bar">
-                        <div className="search-box">
-                            <Search className="search-icon" />
-                            <input
-                                type="text"
-                                className="search-input"
-                                placeholder="Rechercher code, libellé, client..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--slate-400)' }}>
-                                {filteredDossiers.length} DOSSIERS
-                            </span>
-                        </div>
-                    </div>
+                {/* Table */}
+                <div style={{ background: 'white', borderRadius: '20px', border: '1px solid #e5e7eb', boxShadow: '0 4px 16px rgba(0,0,0,.06)', overflow: 'hidden' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                            <tr style={{ background: '#f8fafc', borderBottom: '2px solid #f1f5f9' }}>
+                                {['Identifiant', 'Détails du dossier', 'Client', 'Mode', 'État', 'Actions'].map((h, i) => (
+                                    <th key={h} style={{
+                                        padding: '14px 20px', textAlign: i === 5 ? 'right' : 'left',
+                                        fontSize: '11px', fontWeight: 700, color: '#94a3b8',
+                                        textTransform: 'uppercase', letterSpacing: '.06em',
+                                    }}>{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredDossiers.length > 0 ? filteredDossiers.map(dossier => {
+                                const mc  = modeConf(dossier.mode)
+                                const isH = hoveredRow === dossier.id
 
-                    <div className="table-scroll">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Identifiant</th>
-                                    <th>Détails du dossier</th>
-                                    <th>Destination / Client</th>
-                                    <th>Flux / Mode</th>
-                                    <th>État</th>
-                                    <th style={{ textAlign: 'right' }}>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredDossiers.length > 0 ? (
-                                    filteredDossiers.map((dossier) => (
-                                        <tr
-                                            key={dossier.id}
-                                            className="tr-row"
-                                            onClick={() => navigate(`/dossiers/${dossier.id}`)}
-                                        >
-                                            <td>
-                                                <span className="code-pill">{dossier.code}</span>
-                                            </td>
-                                            <td>
-                                                <span style={{ fontWeight: 700, color: 'var(--slate-800)' }}>{dossier.label}</span>
-                                                <span className="label-text">{dossier.nature === 'IMP' ? 'Importation' : 'Exportation'}</span>
-                                            </td>
-                                            <td>
-                                                <span className="client-name">{dossier.clientName || '---'}</span>
-                                                <span className="label-text">ID: {dossier.clientId || 'N/A'}</span>
-                                            </td>
-                                            <td>
-                                                <div className="mode-badge">
-                                                    {getModeIcon(dossier.mode)}
-                                                    {dossier.mode === 'MA' ? 'Maritime' : dossier.mode === 'AE' ? 'Aérien' : 'Routier'}
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <span className={`badge ${dossier.status === 'CLOSED' ? 'badge-amber' : 'badge-green'}`}>
+                                return (
+                                    <tr
+                                        key={dossier.id}
+                                        onClick={() => navigate(`/dossiers/${dossier.id}`)}
+                                        onMouseEnter={() => setHoveredRow(dossier.id)}
+                                        onMouseLeave={() => setHoveredRow(null)}
+                                        style={{ borderBottom: '1px solid #f1f5f9', background: isH ? '#fffbeb' : 'white', cursor: 'pointer', transition: 'background .15s' }}
+                                    >
+                                        {/* Code */}
+                                        <td style={{ padding: '16px 20px' }}>
+                                            <span style={{
+                                                fontFamily: 'monospace', fontWeight: 700, fontSize: '12px',
+                                                color: isH ? '#b45309' : '#4f46e5',
+                                                background: isH ? '#fef3c7' : '#eff6ff',
+                                                padding: '4px 10px', borderRadius: '7px',
+                                                border: `1px solid ${isH ? '#fde68a' : '#dbeafe'}`,
+                                                whiteSpace: 'nowrap', display: 'inline-block',
+                                                transition: 'all .15s',
+                                            }}>
+                                                {dossier.code}
+                                            </span>
+                                        </td>
+
+                                        {/* Détails */}
+                                        <td style={{ padding: '16px 20px', maxWidth: '280px' }}>
+                                            <div style={{ fontWeight: 700, fontSize: '14px', color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {dossier.label}
+                                            </div>
+                                            <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>
+                                                {dossier.nature === 'IMP' ? '↓ Importation' : '↑ Exportation'}
+                                            </div>
+                                        </td>
+
+                                        {/* Client */}
+                                        <td style={{ padding: '16px 20px' }}>
+                                            <div style={{ fontWeight: 700, fontSize: '14px', color: '#111827' }}>
+                                                {dossier.clientName || <span style={{ color: '#d1d5db', fontStyle: 'italic' }}>Non défini</span>}
+                                            </div>
+                                            {dossier.clientId && (
+                                                <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>ID: {dossier.clientId}</div>
+                                            )}
+                                        </td>
+
+                                        {/* Mode */}
+                                        <td style={{ padding: '16px 20px' }}>
+                                            <span style={{
+                                                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                                                padding: '5px 10px', borderRadius: '8px',
+                                                fontSize: '12px', fontWeight: 700,
+                                                background: mc.bg, color: mc.color,
+                                            }}>
+                                                {mc.icon} {mc.label}
+                                            </span>
+                                        </td>
+
+                                        {/* État */}
+                                        <td style={{ padding: '16px 20px' }}>
+                                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                                <span style={{
+                                                    padding: '4px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: 700,
+                                                    background: dossier.status === 'CLOSED' ? '#fef3c7' : '#f0fdf4',
+                                                    color:      dossier.status === 'CLOSED' ? '#92400e'  : '#15803d',
+                                                }}>
                                                     {dossier.status === 'CLOSED' ? 'Clôturé' : 'En cours'}
                                                 </span>
-                                            </td>
-                                            <td>
-                                                <div className="row-actions">
-                                                    <button className="icon-btn" title="Modifier">
-                                                        <Edit size={16} />
-                                                    </button>
-                                                    <button
-                                                        className="icon-btn delete"
-                                                        title="Supprimer"
-                                                        onClick={(e) => handleDelete(e, dossier.id)}
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                    <div className="icon-btn">
-                                                        <ChevronRight size={18} />
-                                                    </div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan="6">
-                                            <div className="empty-view">
-                                                <Info size={48} style={{ opacity: 0.1, marginBottom: '1.5rem' }} />
-                                                <p style={{ fontWeight: 600, fontSize: '1.125rem' }}>Aucun dossier disponible</p>
-                                                <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>{searchTerm ? 'Affines vos critères de recherche.' : 'Commencez par créer votre premier dossier.'}</p>
+                                                <span style={{
+                                                    padding: '4px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: 700,
+                                                    background: dossier.isBilled ? '#f0fdf4' : '#fff7ed',
+                                                    color:      dossier.isBilled ? '#15803d' : '#c2410c',
+                                                }}>
+                                                    {dossier.isBilled ? 'Facturé' : 'Non facturé'}
+                                                </span>
+                                            </div>
+                                        </td>
+
+                                        {/* Actions */}
+                                        <td style={{ padding: '16px 20px' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>
+                                                <button
+                                                    onClick={e => { e.stopPropagation(); navigate(`/dossiers/${dossier.id}`) }}
+                                                    title="Modifier"
+                                                    style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1.5px solid #e5e7eb', background: isH ? '#fef3c7' : 'white', color: isH ? '#b45309' : '#9ca3af', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }}
+                                                    onMouseEnter={e => { e.currentTarget.style.background='#eff6ff'; e.currentTarget.style.color='#2563eb'; e.currentTarget.style.borderColor='#bfdbfe' }}
+                                                    onMouseLeave={e => { e.currentTarget.style.background=isH?'#fef3c7':'white'; e.currentTarget.style.color=isH?'#b45309':'#9ca3af'; e.currentTarget.style.borderColor='#e5e7eb' }}
+                                                >
+                                                    <Edit2 size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={e => handleDelete(e, dossier.id)}
+                                                    title="Supprimer"
+                                                    style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1.5px solid #e5e7eb', background: 'white', color: '#9ca3af', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }}
+                                                    onMouseEnter={e => { e.currentTarget.style.background='#fff1f2'; e.currentTarget.style.color='#e11d48'; e.currentTarget.style.borderColor='#fecdd3' }}
+                                                    onMouseLeave={e => { e.currentTarget.style.background='white'; e.currentTarget.style.color='#9ca3af'; e.currentTarget.style.borderColor='#e5e7eb' }}
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={e => { e.stopPropagation(); navigate(`/dossiers/${dossier.id}`) }}
+                                                    style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1.5px solid #e5e7eb', background: isH ? '#f59e0b' : 'white', color: isH ? 'white' : '#9ca3af', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }}
+                                                >
+                                                    <ChevronRight size={15} />
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                                )
+                            }) : (
+                                <tr>
+                                    <td colSpan={6} style={{ padding: '64px 40px', textAlign: 'center' }}>
+                                        <div style={{ width: '64px', height: '64px', borderRadius: '18px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                                            <FolderOpen size={28} style={{ color: '#d1d5db' }} />
+                                        </div>
+                                        <div style={{ fontSize: '16px', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
+                                            {searchTerm ? 'Aucun résultat' : 'Aucun dossier'}
+                                        </div>
+                                        <p style={{ fontSize: '14px', color: '#9ca3af', margin: '0 0 20px' }}>
+                                            {searchTerm ? `Aucun dossier ne correspond à "${searchTerm}"` : 'Créez votre premier dossier de transit'}
+                                        </p>
+                                        {!searchTerm && (
+                                            <button onClick={() => navigate('/dossiers/new')} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: '#f59e0b', color: 'white', fontSize: '14px', fontWeight: 700 }}>
+                                                <Plus size={16} /> Nouveau dossier
+                                            </button>
+                                        )}
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
-    );
-};
-
-export default DossierList;
+    )
+}
