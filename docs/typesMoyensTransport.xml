@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<?xml-stylesheet type="text/xsl" href="typesMoyensTransport.xsl"?>
+<WINDEV_TABLE>
+  <TABLE_CONTENU>
+    <N__Enr.>1</N__Enr.>
+    <IDTypesMoyensTransport>1</IDTypesMoyensTransport>
+    <LibelleTypeMoyenTransport>Navire</LibelleTypeMoyenTransport>
+  </TABLE_CONTENU>
+  <TABLE_CONTENU>
+    <N__Enr.>2</N__Enr.>
+    <IDTypesMoyensTransport>2</IDTypesMoyensTransport>
+    <LibelleTypeMoyenTransport>Avion</LibelleTypeMoyenTransport>
+  </TABLE_CONTENU>
+  <TABLE_CONTENU>
+    <N__Enr.>3</N__Enr.>
+    <IDTypesMoyensTransport>3</IDTypesMoyensTransport>
+    <LibelleTypeMoyenTransport>Camion</LibelleTypeMoyenTransport>
+  </TABLE_CONTENU>
+  <TABLE_CONTENU>
+    <N__Enr.>4</N__Enr.>
+    <IDTypesMoyensTransport>4</IDTypesMoyensTransport>
+    <LibelleTypeMoyenTransport>Train</LibelleTypeMoyenTransport>
+  </TABLE_CONTENU>
+  <TABLE_CONTENU>
+    <N__Enr.>5</N__Enr.>
+    <IDTypesMoyensTransport>5</IDTypesMoyensTransport>
+    <LibelleTypeMoyenTransport>conventionnel</LibelleTypeMoyenTransport>
+  </TABLE_CONTENU>
+  <TABLE_CONTENU>
+    <N__Enr.>6</N__Enr.>
+    <IDTypesMoyensTransport>6</IDTypesMoyensTransport>
+    <LibelleTypeMoyenTransport>sortie d entrepot fictif</LibelleTypeMoyenTransport>
+  </TABLE_CONTENU>
+</WINDEV_TABLE>

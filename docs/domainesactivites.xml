@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<?xml-stylesheet type="text/xsl" href="domainesactivites.xsl"?>
+<WINDEV_TABLE>
+  <TABLE_CONTENU>
+    <N__Enr.>1</N__Enr.>
+    <IDDomaineActivite>1</IDDomaineActivite>
+    <LibelleDomaineActivite>Transport maritime</LibelleDomaineActivite>
+    <Code>MA</Code>
+  </TABLE_CONTENU>
+  <TABLE_CONTENU>
+    <N__Enr.>2</N__Enr.>
+    <IDDomaineActivite>2</IDDomaineActivite>
+    <LibelleDomaineActivite>Transport terrestre</LibelleDomaineActivite>
+    <Code>TE</Code>
+  </TABLE_CONTENU>
+  <TABLE_CONTENU>
+    <N__Enr.>3</N__Enr.>
+    <IDDomaineActivite>3</IDDomaineActivite>
+    <LibelleDomaineActivite>Transport aérien</LibelleDomaineActivite>
+    <Code>AE</Code>
+  </TABLE_CONTENU>
+  <TABLE_CONTENU>
+    <N__Enr.>4</N__Enr.>
+    <IDDomaineActivite>4</IDDomaineActivite>
+    <LibelleDomaineActivite>Manutention</LibelleDomaineActivite>
+    <Code>MN</Code>
+  </TABLE_CONTENU>
+  <TABLE_CONTENU>
+    <N__Enr.>5</N__Enr.>
+    <IDDomaineActivite>5</IDDomaineActivite>
+    <LibelleDomaineActivite>Magasinage</LibelleDomaineActivite>
+    <Code>MG</Code>
+  </TABLE_CONTENU>
+</WINDEV_TABLE>

@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS lieux (
+    IDLieux INT PRIMARY KEY,
+    NomLieu VARCHAR(255) NOT NULL,
+    Observations TEXT,
+    TypeLieu VARCHAR(100),
+    IDPays INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (IDPays) REFERENCES Pays(IDPays)
+);

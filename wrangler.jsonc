@@ -1,0 +1,5 @@
+{
+  "name": "soft-transit-worker",
+  "main": "src/index.js", // Le chemin vers votre point d'entrée
+  "compatibility_date": "2024-04-01"
+}
