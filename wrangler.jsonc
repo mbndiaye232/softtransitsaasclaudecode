@@ -12,11 +12,11 @@
   // Secrets à définir via : wrangler secret put BACKEND_URL
   // BACKEND_URL = URL de ton serveur Express (ex: https://api.mondomaine.com)
 
-  // Routes — remplace par ton domaine Cloudflare
+  // Routes — API sur le sous-domaine api.softtransit.net
   "routes": [
     {
-      "pattern": "api.softtransit.com/*",
-      "zone_name": "softtransit.com"
+      "pattern": "api.softtransit.net/*",
+      "zone_name": "softtransit.net"
     }
   ],
 
