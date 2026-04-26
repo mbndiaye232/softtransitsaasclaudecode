@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Home, Settings, LogOut, ChevronLeft, Menu, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import logoSST from '../assets/logo-sst-small.png';
+import logoSST from '../assets/icone-soft-transit.svg';
 
 export default function FloatingNav() {
     const navigate = useNavigate();

@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Lock, User, Eye, EyeOff, ArrowRight, ShieldCheck, Globe, Activity, Layers, Info } from 'lucide-react'
-import logoSST from '../assets/logo-sst.png'
+import logoSST from '../assets/icone-soft-transit.svg'
 
 export default function Login() {
     const navigate = useNavigate()
