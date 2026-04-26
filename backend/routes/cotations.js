@@ -33,7 +33,7 @@ router.get('/dashboard', checkPermission('COTATIONS', 'can_view'), async (req, r
             FROM dossiers d
             LEFT JOIN clients cl ON d.IDCLIENTS = cl.IDCLIENTS
             LEFT JOIN dossier_cotations dc ON d.IDDossiers = dc.dossier_id AND dc.is_active = 1
-            LEFT JOIN Agents a ON dc.agent_id = a.IDAgents
+            LEFT JOIN agents a ON dc.agent_id = a.IDAgents
             LEFT JOIN (
                 SELECT 
                     nd.IDDossiers,
@@ -65,7 +65,7 @@ router.get('/dossier/:id', checkPermission('COTATIONS', 'can_view'), async (req,
         const query = `
             SELECT c.*, a.NomAgent as agent_name
             FROM dossier_cotations c
-            JOIN Agents a ON c.agent_id = a.IDAgents
+            JOIN agents a ON c.agent_id = a.IDAgents
             WHERE c.dossier_id = ?
             ORDER BY c.date_effet DESC, c.created_at DESC
         `;

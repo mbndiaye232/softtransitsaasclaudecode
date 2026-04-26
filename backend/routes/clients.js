@@ -49,7 +49,7 @@ router.get('/', checkPermission('CLIENTS', 'can_view'), async (req, res) => {
     try {
         let query = `
             SELECT c.*, s.NomSociete as company_name 
-            FROM CLIENTS c
+            FROM clients c
             JOIN structur s ON c.structur_id = s.IDSociete
         `;
         let params = [];
@@ -86,7 +86,7 @@ router.get('/', checkPermission('CLIENTS', 'can_view'), async (req, res) => {
  */
 router.get('/:id', checkPermission('CLIENTS', 'can_view'), async (req, res) => {
     try {
-        let query = 'SELECT * FROM CLIENTS WHERE IDCLIENTS = ?';
+        let query = 'SELECT * FROM clients WHERE IDCLIENTS = ?';
         let params = [req.params.id];
 
         if (!req.user.is_provider) {
@@ -142,7 +142,7 @@ router.post('/', checkPermission('CLIENTS', 'can_create'), uploader.single('Chem
         // Check uniqueness of CodeClient
         if (CodeClient) {
             const [existingCode] = await connection.query(
-                `SELECT IDCLIENTS FROM CLIENTS WHERE CodeClient = ? AND structur_id = ?`,
+                `SELECT IDCLIENTS FROM clients WHERE CodeClient = ? AND structur_id = ?`,
                 [CodeClient, structur_id]
             );
             if (existingCode.length > 0) {
@@ -153,7 +153,7 @@ router.post('/', checkPermission('CLIENTS', 'can_create'), uploader.single('Chem
         // Check uniqueness of NumCompteSAARI
         if (NumCompteSAARI) {
             const [existingSaari] = await connection.query(
-                `SELECT IDCLIENTS FROM CLIENTS WHERE NumCompteSAARI = ? AND structur_id = ?`,
+                `SELECT IDCLIENTS FROM clients WHERE NumCompteSAARI = ? AND structur_id = ?`,
                 [NumCompteSAARI, structur_id]
             );
             if (existingSaari.length > 0) {
@@ -258,7 +258,7 @@ router.put('/:id', checkPermission('CLIENTS', 'can_edit'), uploader.single('Chem
         await connection.beginTransaction();
 
         // Check if client exists and belongs to company
-        let query = `SELECT * FROM CLIENTS WHERE IDCLIENTS = ?`;
+        let query = `SELECT * FROM clients WHERE IDCLIENTS = ?`;
         let params = [clientId];
         if (!req.user.is_provider) {
             query += ' AND structur_id = ?';
@@ -274,7 +274,7 @@ router.put('/:id', checkPermission('CLIENTS', 'can_edit'), uploader.single('Chem
         // Check uniqueness of CodeClient if changed
         if (CodeClient && CodeClient !== existingClient[0].CodeClient) {
             const [existingCode] = await connection.query(
-                `SELECT IDCLIENTS FROM CLIENTS WHERE CodeClient = ? AND structur_id = ? AND IDCLIENTS != ?`,
+                `SELECT IDCLIENTS FROM clients WHERE CodeClient = ? AND structur_id = ? AND IDCLIENTS != ?`,
                 [CodeClient, structur_id, clientId]
             );
             if (existingCode.length > 0) {
@@ -285,7 +285,7 @@ router.put('/:id', checkPermission('CLIENTS', 'can_edit'), uploader.single('Chem
         // Check uniqueness of NumCompteSAARI if changed
         if (NumCompteSAARI && NumCompteSAARI !== existingClient[0].NumCompteSAARI) {
             const [existingSaari] = await connection.query(
-                `SELECT IDCLIENTS FROM CLIENTS WHERE NumCompteSAARI = ? AND structur_id = ? AND IDCLIENTS != ?`,
+                `SELECT IDCLIENTS FROM clients WHERE NumCompteSAARI = ? AND structur_id = ? AND IDCLIENTS != ?`,
                 [NumCompteSAARI, structur_id, clientId]
             );
             if (existingSaari.length > 0) {
@@ -425,7 +425,7 @@ router.delete('/:id', checkPermission('CLIENTS', 'can_delete'), async (req, res)
         }
 
         const [result] = await connection.query(
-            'DELETE FROM CLIENTS WHERE IDCLIENTS = ?',
+            'DELETE FROM clients WHERE IDCLIENTS = ?',
             [clientId]
         );
 

@@ -16,7 +16,7 @@ router.get('/dossier/:dossierId', checkPermission('DOSSIERS', 'can_view'), async
         const [rows] = await pool.query(
             `SELECT d.*, a.NomAgent as agent_name 
              FROM declarations d 
-             LEFT JOIN Agents a ON d.IdAgent = a.IDAgents 
+             LEFT JOIN agents a ON d.IdAgent = a.IDAgents 
              WHERE d.IDDossiers = ? 
              ORDER BY d.DateDeclaration DESC`,
             [req.params.dossierId]
@@ -37,7 +37,7 @@ router.get('/dossier/:dossierId/active-cotation', checkPermission('DOSSIERS', 'c
         const query = `
             SELECT dc.*, a.NomAgent as name, a.Tel as phone, a.Email as email, a.cheminphoto as photo 
             FROM dossier_cotations dc
-            JOIN Agents a ON dc.agent_id = a.IDAgents
+            JOIN agents a ON dc.agent_id = a.IDAgents
             WHERE dc.dossier_id = ? AND dc.is_active = 1
             LIMIT 1
         `;

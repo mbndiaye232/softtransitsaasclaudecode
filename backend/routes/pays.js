@@ -14,7 +14,7 @@ router.use(tenantMiddleware);
  */
 router.get('/', checkPermission('CONFIG', 'can_view'), async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM Pays ORDER BY NomPays ASC');
+        const [rows] = await pool.query('SELECT * FROM pays ORDER BY NomPays ASC');
         res.json(rows);
     } catch (error) {
         console.error('Error fetching countries:', error);
@@ -93,7 +93,7 @@ router.put('/:id', checkPermission('CONFIG', 'can_edit'), async (req, res) => {
 router.delete('/:id', checkPermission('CONFIG', 'can_delete'), async (req, res) => {
     try {
         const { id } = req.params;
-        await pool.query('DELETE FROM Pays WHERE IDPays = ?', [id]);
+        await pool.query('DELETE FROM pays WHERE IDPays = ?', [id]);
 
         await auditService.log({
             agent_id: req.user.id,

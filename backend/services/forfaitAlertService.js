@@ -25,7 +25,7 @@ async function checkForfaitRenewals() {
                DATEDIFF(s.forfait_expires_at, NOW()) as days_left,
                a.Email as admin_email, a.NomAgent as admin_name
              FROM structur s
-             LEFT JOIN Agents a ON a.structur_id = s.IDSociete
+             LEFT JOIN agents a ON a.structur_id = s.IDSociete
                AND a.role = 'ADMIN' AND a.is_active = 1
              WHERE s.billing_mode = 'forfait'
                AND s.forfait_type = 'annuel'

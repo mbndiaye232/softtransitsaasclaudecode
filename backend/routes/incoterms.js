@@ -10,7 +10,7 @@ router.use(tenantMiddleware);
 // GET /api/incoterms - List all incoterms
 router.get('/', checkPermission('CONFIG', 'can_view'), async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM Incoterm ORDER BY CodeIncoterm');
+        const [rows] = await pool.query('SELECT * FROM incoterm ORDER BY CodeIncoterm');
         res.json(rows);
     } catch (error) {
         console.error(error);

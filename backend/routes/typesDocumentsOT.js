@@ -10,7 +10,7 @@ router.use(tenantMiddleware);
 // GET /api/types-documents-ot - List all OT document types
 router.get('/', checkPermission('CONFIG', 'can_view'), async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM TypesDocumentsOT ORDER BY LibelleTypeDocumentsOT');
+        const [rows] = await pool.query('SELECT * FROM typesdocumentsot ORDER BY LibelleTypeDocumentsOT');
         res.json(rows);
     } catch (error) {
         console.error(error);

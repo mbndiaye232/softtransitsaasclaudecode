@@ -21,7 +21,7 @@ async function checkCreditAlerts(structur_id, newBalance) {
         const [rows] = await pool.query(
             `SELECT s.*, a.Email as admin_email, a.NomAgent as admin_name
              FROM structur s
-             LEFT JOIN Agents a ON a.structur_id = s.IDSociete AND a.role = 'ADMIN' AND a.is_active = 1
+             LEFT JOIN agents a ON a.structur_id = s.IDSociete AND a.role = 'ADMIN' AND a.is_active = 1
              WHERE s.IDSociete = ? AND s.billing_mode = 'credits'
              LIMIT 1`,
             [structur_id]

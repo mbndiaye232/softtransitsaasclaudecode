@@ -19,7 +19,7 @@ router.get('/', checkPermission('AGENTS', 'can_view'), async (req, res) => {
                 g.*,
                 COUNT(a.IDAgents) as user_count
             FROM groupes g
-            LEFT JOIN Agents a ON g.IDGroupes = a.IDGroupes AND a.is_active = 1
+            LEFT JOIN agents a ON g.IDGroupes = a.IDGroupes AND a.is_active = 1
             WHERE g.structur_id = ? AND g.is_active = 1
             GROUP BY g.IDGroupes
             ORDER BY g.LibelleGroupe`,
@@ -175,7 +175,7 @@ router.delete('/:id', checkPermission('AGENTS', 'can_delete'), async (req, res) 
         }
 
         const [users] = await pool.query(
-            'SELECT COUNT(*) as count FROM Agents WHERE IDGroupes = ? AND is_active = 1',
+            'SELECT COUNT(*) as count FROM agents WHERE IDGroupes = ? AND is_active = 1',
             [req.params.id]
         );
 

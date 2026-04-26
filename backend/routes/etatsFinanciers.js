@@ -442,7 +442,7 @@ router.get('/ca-clients', checkPermission('FACTURES', 'can_view'), async (req, r
                 c.TelClient,
                 SUM(f.MontantTTCFacture) as caTTC,
                 SUM(f.MontantHTFacture) as caHT
-            FROM CLIENTS c
+            FROM clients c
             JOIN dossiers d ON c.IDCLIENTS = d.IDCLIENTS
             JOIN factures f ON d.IDDossiers = f.IDDossiers
             WHERE f.Validee = 1

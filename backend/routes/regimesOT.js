@@ -10,7 +10,7 @@ router.use(tenantMiddleware);
 // GET /api/regimes-ot - List all OT regimes
 router.get('/', checkPermission('CONFIG', 'can_view'), async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM RegimeOT ORDER BY CodeRegimeOT');
+        const [rows] = await pool.query('SELECT * FROM regimeot ORDER BY CodeRegimeOT');
         res.json(rows);
     } catch (error) {
         console.error(error);

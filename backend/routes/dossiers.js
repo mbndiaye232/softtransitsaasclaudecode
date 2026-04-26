@@ -70,7 +70,7 @@ router.get('/', checkPermission('DOSSIERS', 'can_view'), async (req, res) => {
                 s.NomSociete as company_name
             FROM dossiers d
             JOIN structur s ON d.structur_id = s.IDSociete
-            LEFT JOIN CLIENTS c ON d.IDCLIENTS = c.IDCLIENTS
+            LEFT JOIN clients c ON d.IDCLIENTS = c.IDCLIENTS
         `;
         let params = [];
 
@@ -221,7 +221,7 @@ router.get('/:id', checkPermission('DOSSIERS', 'can_view'), async (req, res) => 
                     d.observations as observations, d.cheminfiche as fileUrl, d.IdAgentValidation as validatedByAgentId,
                     d.Facturable as isFacturable, d.SaisiLe as createdAt, d.DateRemise as dateRemiseDocs
              FROM dossiers d
-             LEFT JOIN CLIENTS c ON d.IDCLIENTS = c.IDCLIENTS
+             LEFT JOIN clients c ON d.IDCLIENTS = c.IDCLIENTS
              WHERE d.IDDossiers = ?
         `;
         let params = [req.params.id];

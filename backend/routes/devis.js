@@ -153,7 +153,7 @@ router.get('/:id', async (req, res) => {
         if (!devis) return res.status(404).json({ error: 'Devis introuvable' });
 
         const [rubriques] = await pool.query(
-            'SELECT * FROM LiaisonCotationsRubriques WHERE IDCotation = ?',
+            'SELECT * FROM liaisoncotationsrubriques WHERE IDCotation = ?',
             [req.params.id]
         );
 
@@ -205,7 +205,7 @@ router.delete('/:id', async (req, res) => {
             return res.status(400).json({ error: 'Impossible de supprimer un devis accepté.' });
         }
 
-        await connection.query('DELETE FROM LiaisonCotationsRubriques WHERE IDCotation = ?', [req.params.id]);
+        await connection.query('DELETE FROM liaisoncotationsrubriques WHERE IDCotation = ?', [req.params.id]);
         await connection.query('DELETE FROM cotations WHERE IDCotations = ?', [req.params.id]);
 
         await connection.commit();

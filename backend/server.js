@@ -11,6 +11,7 @@ const allowedOrigins = [
     'http://localhost:5174',
     'https://softtransit.net',
     'https://www.softtransit.net',
+    'https://softtransitsaasclaudecode.pages.dev',
     process.env.FRONTEND_URL
 ].filter(Boolean);
 

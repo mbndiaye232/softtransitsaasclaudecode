@@ -27,7 +27,7 @@ router.get('/dashboard', async (req, res) => {
 
         // 2. User/Team count (table is 'Agents')
         const [userStats] = await pool.query(
-            "SELECT COUNT(*) as count FROM Agents WHERE structur_id = ? AND is_active = 1",
+            "SELECT COUNT(*) as count FROM agents WHERE structur_id = ? AND is_active = 1",
             [structur_id]
         );
 

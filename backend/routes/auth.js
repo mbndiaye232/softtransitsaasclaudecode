@@ -61,7 +61,7 @@ router.post('/register', async (req, res) => {
         }
 
         const [existingUser] = await connection.query(
-            'SELECT IDAgents FROM Agents WHERE Login = ? OR Email = ?',
+            'SELECT IDAgents FROM agents WHERE Login = ? OR Email = ?',
             [adminLogin, adminEmail]
         );
 
@@ -162,7 +162,7 @@ router.post('/login', async (req, res) => {
         a.two_factor_enabled,
         s.NomSociete as company_name,
         s.is_active as company_active
-      FROM Agents a
+      FROM agents a
       JOIN structur s ON a.structur_id = s.IDSociete
       WHERE (a.Login = ? OR a.Email = ?)`,
             [login, login]
@@ -240,7 +240,7 @@ router.get('/me', authMiddleware, async (req, res) => {
         s.NomSociete as company_name,
         s.credit_balance,
         s.Emailstructur as company_email
-      FROM Agents a
+      FROM agents a
       JOIN structur s ON a.structur_id = s.IDSociete
       WHERE a.IDAgents = ?`,
             [req.user.id]
@@ -272,7 +272,7 @@ router.post('/forgot-password', async (req, res) => {
         }
 
         const [users] = await pool.query(
-            'SELECT IDAgents, NomAgent, Email FROM Agents WHERE Email = ? AND is_active = 1',
+            'SELECT IDAgents, NomAgent, Email FROM agents WHERE Email = ? AND is_active = 1',
             [email]
         );
 
@@ -328,7 +328,7 @@ router.post('/reset-password', async (req, res) => {
         // Find user with valid token
         const [users] = await pool.query(
             `SELECT IDAgents, Email 
-       FROM Agents 
+       FROM agents 
        WHERE reset_token = ? 
        AND reset_token_expires > NOW() 
        AND is_active = 1`,

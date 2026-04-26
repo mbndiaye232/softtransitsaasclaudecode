@@ -142,7 +142,7 @@ router.get('/', checkPermission('AGENTS', 'can_view'), async (req, res) => {
                 g.LibelleGroupe as group_name,
                 a.last_login,
                 s.NomSociete as company_name
-            FROM Agents a
+            FROM agents a
             LEFT JOIN groupes g ON a.IDGroupes = g.IDGroupes
             JOIN structur s ON a.structur_id = s.IDSociete
         `;
@@ -183,7 +183,7 @@ router.get('/:id', checkPermission('AGENTS', 'can_view'), async (req, res) => {
                 a.is_active,
                 a.IDGroupes,
                 g.LibelleGroupe as group_name
-            FROM Agents a
+            FROM agents a
             LEFT JOIN groupes g ON a.IDGroupes = g.IDGroupes
             WHERE a.IDAgents = ?
         `;
@@ -245,7 +245,7 @@ router.post('/', checkPermission('AGENTS', 'can_create'), async (req, res) => {
 
         // Check if login or email already exists
         const [existing] = await pool.query(
-            'SELECT IDAgents FROM Agents WHERE (Login = ? OR Email = ?) AND structur_id = ?',
+            'SELECT IDAgents FROM agents WHERE (Login = ? OR Email = ?) AND structur_id = ?',
             [Login, Email, structur_id]
         );
 
@@ -319,7 +319,7 @@ router.put('/:id', checkPermission('AGENTS', 'can_edit'), async (req, res) => {
         } = req.body;
 
         // Check if user exists and belongs to company (unless provider)
-        let query = 'SELECT IDAgents FROM Agents WHERE IDAgents = ?';
+        let query = 'SELECT IDAgents FROM agents WHERE IDAgents = ?';
         let params = [req.params.id];
         if (!req.user.is_provider) {
             query += ' AND structur_id = ?';
@@ -342,7 +342,7 @@ router.put('/:id', checkPermission('AGENTS', 'can_edit'), async (req, res) => {
         }
 
         // Check if login or email conflicts
-        let conflictQuery = 'SELECT IDAgents FROM Agents WHERE (Login = ? OR Email = ?) AND IDAgents != ?';
+        let conflictQuery = 'SELECT IDAgents FROM agents WHERE (Login = ? OR Email = ?) AND IDAgents != ?';
         let conflictParams = [Login, Email, req.params.id];
         if (!req.user.is_provider) {
             conflictQuery += ' AND structur_id = ?';
@@ -421,7 +421,7 @@ router.put('/:id', checkPermission('AGENTS', 'can_edit'), async (req, res) => {
  */
 router.delete('/:id', checkPermission('AGENTS', 'can_delete'), async (req, res) => {
     try {
-        let query = 'SELECT IDAgents FROM Agents WHERE IDAgents = ?';
+        let query = 'SELECT IDAgents FROM agents WHERE IDAgents = ?';
         let params = [req.params.id];
         if (!req.user.is_provider) {
             query += ' AND structur_id = ?';
@@ -463,7 +463,7 @@ router.delete('/:id', checkPermission('AGENTS', 'can_delete'), async (req, res) 
  */
 router.patch('/:id/reactivate', checkPermission('AGENTS', 'can_edit'), async (req, res) => {
     try {
-        let query = 'SELECT IDAgents, is_active FROM Agents WHERE IDAgents = ?';
+        let query = 'SELECT IDAgents, is_active FROM agents WHERE IDAgents = ?';
         let params = [req.params.id];
         if (!req.user.is_provider) {
             query += ' AND structur_id = ?';
@@ -515,7 +515,7 @@ router.put('/:id/super-admin', requireSuperAdmin, async (req, res) => {
 
     try {
         const [[target]] = await pool.query(
-            'SELECT IDAgents, NomAgent, role FROM Agents WHERE IDAgents = ?',
+            'SELECT IDAgents, NomAgent, role FROM agents WHERE IDAgents = ?',
             [targetId]
         );
         if (!target) return res.status(404).json({ error: 'Utilisateur non trouvé' });
@@ -530,7 +530,7 @@ router.put('/:id/super-admin', requireSuperAdmin, async (req, res) => {
         // Mettre is_provider sur la société si promotion
         if (grant) {
             await pool.query(
-                'UPDATE structur SET is_provider = 1 WHERE IDSociete = (SELECT structur_id FROM Agents WHERE IDAgents = ?)',
+                'UPDATE structur SET is_provider = 1 WHERE IDSociete = (SELECT structur_id FROM agents WHERE IDAgents = ?)',
                 [targetId]
             );
         }

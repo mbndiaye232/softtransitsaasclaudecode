@@ -586,8 +586,8 @@ router.get('/admin/companies', requireSuperAdmin, async (req, res) => {
                COUNT(DISTINCT d.IDDossiers) as dossier_count,
                SUM(CASE WHEN t.type='PURCHASE' AND t.status='COMPLETED' THEN t.amount_eur ELSE 0 END) as total_revenue_eur
              FROM structur s
-             LEFT JOIN Agents a ON a.structur_id = s.IDSociete AND a.is_active = 1
-             LEFT JOIN Dossiers d ON d.structur_id = s.IDSociete
+             LEFT JOIN agents a ON a.structur_id = s.IDSociete AND a.is_active = 1
+             LEFT JOIN dossiers d ON d.structur_id = s.IDSociete
              LEFT JOIN transactions t ON t.structur_id = s.IDSociete
              GROUP BY s.IDSociete
              ORDER BY s.is_provider DESC, s.created_at DESC`
@@ -1004,11 +1004,11 @@ router.post('/request-mode', async (req, res) => {
                 secure: false, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
             });
             const [[superAdmin]] = await pool.query(
-                "SELECT Email FROM Agents WHERE is_active=1 AND role='ADMIN' LIMIT 1",
+                "SELECT Email FROM agents WHERE is_active=1 AND role='ADMIN' LIMIT 1",
                 // on cible le provider via structur.is_provider
             );
             const adminEmails = await pool.query(
-                "SELECT a.Email FROM Agents a JOIN structur s ON a.structur_id=s.IDSociete WHERE s.is_provider=1 AND a.role='ADMIN' AND a.is_active=1"
+                "SELECT a.Email FROM agents a JOIN structur s ON a.structur_id=s.IDSociete WHERE s.is_provider=1 AND a.role='ADMIN' AND a.is_active=1"
             );
             const targets = (adminEmails[0] || []).map(r => r.Email).join(',');
             if (targets) {
@@ -1046,7 +1046,7 @@ router.get('/request-mode', async (req, res) => {
         const [rows] = await pool.query(
             `SELECT br.*, a.NomAgent as handled_by_name
              FROM billing_requests br
-             LEFT JOIN Agents a ON a.IDAgents = br.handled_by
+             LEFT JOIN agents a ON a.IDAgents = br.handled_by
              WHERE br.structur_id = ?
              ORDER BY br.created_at DESC`,
             [req.structur_id]
@@ -1071,7 +1071,7 @@ router.get('/admin/requests', requireSuperAdmin, async (req, res) => {
                     a.NomAgent as requester_name, a.Email as requester_email
              FROM billing_requests br
              JOIN structur s ON br.structur_id = s.IDSociete
-             JOIN Agents a ON br.agent_id = a.IDAgents
+             JOIN agents a ON br.agent_id = a.IDAgents
              WHERE br.status = ?
              ORDER BY br.created_at DESC`,
             [status]
@@ -1153,7 +1153,7 @@ router.put('/admin/requests/:id', requireSuperAdmin, async (req, res) => {
                 secure: false, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
             });
             const [[agent]] = await pool.query(
-                'SELECT Email, NomAgent FROM Agents WHERE IDAgents = ?', [request.agent_id]
+                'SELECT Email, NomAgent FROM agents WHERE IDAgents = ?', [request.agent_id]
             );
             if (agent) {
                 const approved = action === 'approve';
@@ -1257,7 +1257,7 @@ router.get('/admin/super-admins', requireSuperAdmin, async (req, res) => {
     try {
         const [rows] = await pool.query(`
             SELECT a.IDAgents, a.NomAgent, a.Email, a.role, s.NomSociete as company_name
-            FROM Agents a
+            FROM agents a
             JOIN structur s ON a.structur_id = s.IDSociete
             WHERE a.role IN ('ADMIN','SUPER_ADMIN')
             ORDER BY a.role DESC, a.NomAgent ASC

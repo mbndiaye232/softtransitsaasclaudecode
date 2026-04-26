@@ -17,7 +17,7 @@ router.get('/dossier/:dossierId', checkPermission('DOSSIERS', 'can_view'), async
         const [rows] = await pool.query(
             `    SELECT ml.*, a.NomAgent as foreman_name, a.Tel as foreman_phone, a.cheminphoto as foreman_photo 
                  FROM miseenlivraison ml
-                 LEFT JOIN Agents a ON ml.Idcontremaitre = a.IDAgents
+                 LEFT JOIN agents a ON ml.Idcontremaitre = a.IDAgents
                  WHERE ml.IDDossiers = ?`,
             [req.params.dossierId]
         );
@@ -109,7 +109,7 @@ router.post('/', checkPermission('DOSSIERS', 'can_edit'), async (req, res) => {
 router.get('/foremen', checkPermission('DOSSIERS', 'can_view'), async (req, res) => {
     try {
         const [rows] = await pool.query(
-            'SELECT IDAgents as id, NomAgent as name, Tel as phone, Email as email, cheminphoto as photo FROM Agents WHERE IDGroupes = 11 AND (structur_id = ? OR structur_id = 0)',
+            'SELECT IDAgents as id, NomAgent as name, Tel as phone, Email as email, cheminphoto as photo FROM agents WHERE IDGroupes = 11 AND (structur_id = ? OR structur_id = 0)',
             [req.structur_id]
         );
         res.json(rows);
