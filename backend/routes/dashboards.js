@@ -35,6 +35,7 @@ router.get('/transport-arrivals', checkPermission('DOSSIERS', 'can_view'), async
             )
             -- Optional: join with actual liaison table if transport is not directly linked this way
             WHERE t.DateArriveePrevue IS NOT NULL
+              AND (d.Facturable IS NULL OR d.Facturable != -1)
         `;
         let params = [];
 
@@ -83,7 +84,7 @@ router.get('/dossier-tracking', checkPermission('DOSSIERS', 'can_view'), async (
                     ELSE DATEDIFF(t.DateArriveePrevue, CURDATE())
                 END
             )
-            WHERE 1=1
+            WHERE (d.Facturable IS NULL OR d.Facturable != -1)
         `;
         let params = [];
 
@@ -140,7 +141,7 @@ router.get('/detailed-tracking', checkPermission('DOSSIERS', 'can_view'), async 
             LEFT JOIN agents ag ON decl.IdAgent = ag.IDAgents
             LEFT JOIN miseenlivraison ml ON d.IDDossiers = ml.IDDossiers
             LEFT JOIN ordresdetransport otr ON d.IDDossiers = otr.IDDossiers
-            WHERE 1=1
+            WHERE (d.Facturable IS NULL OR d.Facturable != -1)
         `;
         let params = [];
 
@@ -308,8 +309,9 @@ router.get('/dossier-trends', checkPermission('DOSSIERS', 'can_view'), async (re
     try {
         let query = `
             SELECT DATE_FORMAT(SaisiLe, '%Y-%m') as month, COUNT(*) as count
-            FROM dossiers 
+            FROM dossiers
             WHERE SaisiLe >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+              AND (Facturable IS NULL OR Facturable != -1)
         `;
         let params = [];
         if (!req.is_viewing_all) {

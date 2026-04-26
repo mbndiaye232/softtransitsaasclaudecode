@@ -14,14 +14,14 @@ router.get('/dashboard', async (req, res) => {
     try {
         const structur_id = req.structur_id;
 
-        // 1. Dossiers counts
+        // 1. Dossiers counts (exclude soft-deleted: Facturable = -1)
         const [dossierStats] = await pool.query(
-            `SELECT 
+            `SELECT
                 COUNT(*) as total,
                 COALESCE(SUM(CASE WHEN IdEtapeDossiers = 7 THEN 1 ELSE 0 END), 0) as closed,
                 COALESCE(SUM(CASE WHEN IdEtapeDossiers != 7 THEN 1 ELSE 0 END), 0) as active
-             FROM dossiers 
-             WHERE structur_id = ?`,
+             FROM dossiers
+             WHERE structur_id = ? AND (Facturable IS NULL OR Facturable != -1)`,
             [structur_id]
         );
 
@@ -31,12 +31,13 @@ router.get('/dashboard', async (req, res) => {
             [structur_id]
         );
 
-        // 3. Pending notes
+        // 3. Pending notes (exclude soft-deleted dossiers)
         const [noteStats] = await pool.query(
-            `SELECT COUNT(*) as count 
+            `SELECT COUNT(*) as count
              FROM notesdedetails nd
              JOIN dossiers d ON nd.IDDossiers = d.IDDossiers
-             WHERE d.structur_id = ? AND nd.Valide = 0`,
+             WHERE d.structur_id = ? AND nd.Valide = 0
+               AND (d.Facturable IS NULL OR d.Facturable != -1)`,
             [structur_id]
         );
 
