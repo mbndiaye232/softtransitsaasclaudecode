@@ -75,8 +75,10 @@ router.get('/', checkPermission('DOSSIERS', 'can_view'), async (req, res) => {
         let params = [];
 
         if (!req.is_viewing_all) {
-            query += ' WHERE d.structur_id = ?';
+            query += ' WHERE d.structur_id = ? AND (d.Facturable IS NULL OR d.Facturable != -1)';
             params.push(req.structur_id);
+        } else {
+            query += ' WHERE (d.Facturable IS NULL OR d.Facturable != -1)';
         }
 
         query += ' ORDER BY d.SaisiLe DESC';
@@ -100,7 +102,7 @@ router.get('/client/:clientId', checkPermission('DOSSIERS', 'can_view'), async (
             SELECT d.IDDossiers as id, d.CodeDossier as code, d.Libelle as label,
                    EXISTS(SELECT 1 FROM factures f WHERE f.IDDossiers = d.IDDossiers) as isBilled
             FROM dossiers d
-            WHERE d.IDCLIENTS = ?
+            WHERE d.IDCLIENTS = ? AND (d.Facturable IS NULL OR d.Facturable != -1)
         `;
         let params = [req.params.clientId];
 
