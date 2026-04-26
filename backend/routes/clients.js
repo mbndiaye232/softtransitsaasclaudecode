@@ -163,7 +163,7 @@ router.post('/', checkPermission('CLIENTS', 'can_create'), uploader.single('Chem
 
         // Insert Client
         const [result] = await connection.query(
-            `INSERT INTO CLIENTS (
+            `INSERT INTO clients (
                 structur_id, NomRS, adresseClient, TelClient, IdAgent, CelClient, EmailClient,
                 Observations, IDStatuts, Saisile, NINEA, EncoursAutorise, AssuranceCredit,
                 CheminLettreEXO, TauxRemise, ExonereTVA, PersonneContact, EmailPersonneContact,
@@ -196,7 +196,7 @@ router.post('/', checkPermission('CLIENTS', 'can_create'), uploader.single('Chem
             fs.renameSync(req.file.path, newPath);
             finalCheminLettreEXO = `/uploads/clients/${clientId}_${clientNameSafe}/${req.file.filename}`;
 
-            await connection.query('UPDATE CLIENTS SET CheminLettreEXO = ? WHERE IDCLIENTS = ?', [finalCheminLettreEXO, clientId]);
+            await connection.query('UPDATE clients SET CheminLettreEXO = ? WHERE IDCLIENTS = ?', [finalCheminLettreEXO, clientId]);
         }
 
         // Create Account (ComptesClients)
@@ -305,7 +305,7 @@ router.put('/:id', checkPermission('CLIENTS', 'can_edit'), uploader.single('Chem
         }
 
         // Update Client
-        let updateQuery = `UPDATE CLIENTS SET 
+        let updateQuery = `UPDATE clients SET 
             NomRS=?, adresseClient=?, TelClient=?, CelClient=?, EmailClient=?,
             Observations=?, IDStatuts=?, Modifiele=NOW(), idagentmodification=?, NINEA=?,
             EncoursAutorise=?, AssuranceCredit=?, TauxRemise=?, ExonereTVA=?,
@@ -375,7 +375,7 @@ router.patch('/:id/email', checkPermission('CLIENTS', 'can_edit'), async (req, r
         }
 
         const [result] = await pool.query(
-            'UPDATE CLIENTS SET EmailClient = ?, Modifiele = NOW(), idagentmodification = ? WHERE IDCLIENTS = ?',
+            'UPDATE clients SET EmailClient = ?, Modifiele = NOW(), idagentmodification = ? WHERE IDCLIENTS = ?',
             [email, req.user.id, clientId]
         );
 

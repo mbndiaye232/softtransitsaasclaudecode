@@ -92,7 +92,7 @@ router.post('/register', async (req, res) => {
 
         // Create admin user
         const [userResult] = await connection.query(
-            `INSERT INTO Agents (
+            `INSERT INTO agents (
         structur_id,
         NomAgent,
         Email,
@@ -192,7 +192,7 @@ router.post('/login', async (req, res) => {
 
         // Update last login
         await pool.query(
-            'UPDATE Agents SET last_login = NOW() WHERE IDAgents = ?',
+            'UPDATE agents SET last_login = NOW() WHERE IDAgents = ?',
             [user.id]
         );
 
@@ -287,7 +287,7 @@ router.post('/forgot-password', async (req, res) => {
 
         // Save reset token
         await pool.query(
-            'UPDATE Agents SET reset_token = ?, reset_token_expires = ? WHERE IDAgents = ?',
+            'UPDATE agents SET reset_token = ?, reset_token_expires = ? WHERE IDAgents = ?',
             [resetToken, expiresAt, user.IDAgents]
         );
 
@@ -346,7 +346,7 @@ router.post('/reset-password', async (req, res) => {
 
         // Update password and clear reset token
         await pool.query(
-            `UPDATE Agents 
+            `UPDATE agents 
        SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL 
        WHERE IDAgents = ?`,
             [passwordHash, user.IDAgents]

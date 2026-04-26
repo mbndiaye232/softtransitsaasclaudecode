@@ -1276,7 +1276,7 @@ router.put('/admin/super-admins/:id', requireSuperAdmin, async (req, res) => {
         return res.status(400).json({ error: 'Vous ne pouvez pas modifier votre propre rôle' });
     try {
         const newRole = grant ? 'SUPER_ADMIN' : 'ADMIN';
-        const [result] = await pool.query('UPDATE Agents SET role = ? WHERE IDAgents = ?', [newRole, agentId]);
+        const [result] = await pool.query('UPDATE agents SET role = ? WHERE IDAgents = ?', [newRole, agentId]);
         if (!result.affectedRows) return res.status(404).json({ error: 'Agent introuvable' });
         res.json({ message: `Rôle mis à jour : ${newRole}` });
     } catch (err) {

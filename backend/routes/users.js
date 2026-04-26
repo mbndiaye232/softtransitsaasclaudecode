@@ -258,7 +258,7 @@ router.post('/', checkPermission('AGENTS', 'can_create'), async (req, res) => {
 
         // Create user
         const [result] = await pool.query(
-            `INSERT INTO Agents (
+            `INSERT INTO agents (
                 structur_id, IDGroupes, NomAgent, Email, Login, password_hash,
                 role, FonctionAgent, Tel, Cel, adresse, is_active
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
@@ -392,7 +392,7 @@ router.put('/:id', checkPermission('AGENTS', 'can_edit'), async (req, res) => {
         updateValues.push(req.params.id);
 
         await pool.query(
-            `UPDATE Agents SET ${updateFields.join(', ')} WHERE IDAgents = ?`,
+            `UPDATE agents SET ${updateFields.join(', ')} WHERE IDAgents = ?`,
             updateValues
         );
 
@@ -438,7 +438,7 @@ router.delete('/:id', checkPermission('AGENTS', 'can_delete'), async (req, res) 
             return res.status(400).json({ error: 'Cannot deactivate your own account' });
         }
 
-        await pool.query('UPDATE Agents SET is_active = 0 WHERE IDAgents = ?', [req.params.id]);
+        await pool.query('UPDATE agents SET is_active = 0 WHERE IDAgents = ?', [req.params.id]);
 
         await auditService.log({
             agent_id: req.user.id,
@@ -480,7 +480,7 @@ router.patch('/:id/reactivate', checkPermission('AGENTS', 'can_edit'), async (re
             return res.status(400).json({ error: 'User is already active' });
         }
 
-        await pool.query('UPDATE Agents SET is_active = 1 WHERE IDAgents = ?', [req.params.id]);
+        await pool.query('UPDATE agents SET is_active = 1 WHERE IDAgents = ?', [req.params.id]);
 
         await auditService.log({
             agent_id: req.user.id,
@@ -525,7 +525,7 @@ router.put('/:id/super-admin', requireSuperAdmin, async (req, res) => {
         }
 
         const newRole = grant ? 'SUPER_ADMIN' : 'ADMIN';
-        await pool.query('UPDATE Agents SET role = ? WHERE IDAgents = ?', [newRole, targetId]);
+        await pool.query('UPDATE agents SET role = ? WHERE IDAgents = ?', [newRole, targetId]);
 
         // Mettre is_provider sur la société si promotion
         if (grant) {

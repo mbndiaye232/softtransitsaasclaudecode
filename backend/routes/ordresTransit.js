@@ -116,7 +116,7 @@ router.post('/', checkPermission('DOSSIERS', 'can_create'), async (req, res) => 
         console.log('Data to insert:', { NumeroOT, IDDossiers, structur_id: req.user.structur_id });
 
         const [result] = await connection.query(`
-            INSERT INTO OrdresTransit (
+            INSERT INTO ordrestransit (
                 NumeroOT, DateOT, DateReceptionOT, IdAgent, IDDossiers, NumeroSerie,
                 Idincoterms, BSCExiste, AssuranceExiste, Observations,
                 DateExpedition, AdresseDeLivraison, PROVENANCE, NatureProduits,
@@ -190,7 +190,7 @@ router.put('/:id', checkPermission('DOSSIERS', 'can_edit'), async (req, res) => 
 
         // Update main record
         await connection.query(`
-            UPDATE OrdresTransit SET 
+            UPDATE ordrestransit SET 
                 NumeroOT = ?, DateOT = ?, DateReceptionOT = ?, IDDossiers = ?, NumeroSerie = ?,
                 Idincoterms = ?, BSCExiste = ?, AssuranceExiste = ?, Observations = ?,
                 DateExpedition = ?, AdresseDeLivraison = ?, PROVENANCE = ?, NatureProduits = ?,

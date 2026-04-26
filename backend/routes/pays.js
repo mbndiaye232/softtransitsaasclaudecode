@@ -32,7 +32,7 @@ router.post('/', checkPermission('CONFIG', 'can_create'), async (req, res) => {
         if (!NomPays) return res.status(400).json({ error: 'Le nom du pays est obligatoire' });
 
         const [result] = await pool.query(
-            'INSERT INTO Pays (NomPays, codePays3, CodePays2, CodeNumerique, NomPaysEng) VALUES (?, ?, ?, ?, ?)',
+            'INSERT INTO pays (NomPays, codePays3, CodePays2, CodeNumerique, NomPaysEng) VALUES (?, ?, ?, ?, ?)',
             [NomPays, codePays3, CodePays2, CodeNumerique, NomPaysEng]
         );
 
@@ -64,7 +64,7 @@ router.put('/:id', checkPermission('CONFIG', 'can_edit'), async (req, res) => {
         const { NomPays, codePays3, CodePays2, CodeNumerique, NomPaysEng } = req.body;
         
         await pool.query(
-            'UPDATE Pays SET NomPays = ?, codePays3 = ?, CodePays2 = ?, CodeNumerique = ?, NomPaysEng = ? WHERE IDPays = ?',
+            'UPDATE pays SET NomPays = ?, codePays3 = ?, CodePays2 = ?, CodeNumerique = ?, NomPaysEng = ? WHERE IDPays = ?',
             [NomPays, codePays3, CodePays2, CodeNumerique, NomPaysEng, id]
         );
 
