@@ -16,7 +16,7 @@ const authMiddleware = async (req, res, next) => {
             `SELECT a.IDAgents as id, a.NomAgent as name, a.Email as email,
                     a.Login as login, a.role, a.structur_id, a.is_active,
                     s.NomSociete as company_name, s.is_provider
-             FROM Agents a
+             FROM agents a
              JOIN structur s ON a.structur_id = s.IDSociete
              WHERE a.IDAgents = ? AND a.is_active = 1`,
             [userId]

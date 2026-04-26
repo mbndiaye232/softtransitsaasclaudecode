@@ -181,8 +181,8 @@ export default function Login() {
                     <div className="logo-area" style={{ margin: '0 0 2rem 0', background: 'rgba(255,255,255,0.15)', color: 'white', backdropFilter: 'blur(12px)' }}>
                         <Globe size={32} />
                     </div>
-                    <h2>Simplifiez votre Logistique avec Soft Transit.</h2>
-                    <p>La plateforme SaaS haute performance pour la gestion de vos dossiers de transit, déclarations et cotations en temps réel.</p>
+                    <h2>Moins de paperasse, plus de transit.</h2>
+                    <p>La plateforme SaaS dédiée aux transitaires pour gérer vos dossiers, déclarations douanières et cotations en temps réel.</p>
 
                     <div className="feature-list">
                         <div className="feature-item">
