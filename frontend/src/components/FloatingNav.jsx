@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Home, Settings, LogOut, ChevronLeft, Menu, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import logoSST from '../assets/logo-sst-small.png';
 
 export default function FloatingNav() {
     const navigate = useNavigate();
@@ -171,12 +172,12 @@ export default function FloatingNav() {
 
             `}</style>
             
-            <button 
-                className={`fnav-trigger ${isExpanded ? 'active' : ''}`} 
+            <button
+                className={`fnav-trigger ${isExpanded ? 'active' : ''}`}
                 onClick={() => setIsExpanded(!isExpanded)}
                 title="Menu de navigation rapide"
             >
-                {isExpanded ? <X size={24} /> : <Menu size={24} />}
+                {isExpanded ? <X size={24} /> : <img src={logoSST} alt="SST" style={{ width: '32px', height: '32px', objectFit: 'contain', borderRadius: '50%' }} />}
             </button>
 
             {/* Quick Back isolated button for fast access */}

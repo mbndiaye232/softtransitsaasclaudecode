@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Lock, User, Eye, EyeOff, ArrowRight, ShieldCheck, Globe, Activity, Layers, Info } from 'lucide-react'
+import logoSST from '../assets/logo-sst.png'
 
 export default function Login() {
     const navigate = useNavigate()
@@ -178,8 +179,8 @@ export default function Login() {
                 <div className="bg-glow glow-2"></div>
 
                 <div className="visual-content">
-                    <div className="logo-area" style={{ margin: '0 0 2rem 0', background: 'rgba(255,255,255,0.15)', color: 'white', backdropFilter: 'blur(12px)' }}>
-                        <Globe size={32} />
+                    <div className="logo-area" style={{ margin: '0 0 2rem 0', background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(12px)', padding: '1rem', borderRadius: '1rem' }}>
+                        <img src={logoSST} alt="Soft Services Technologiques" style={{ width: '120px', height: '120px', objectFit: 'contain' }} />
                     </div>
                     <h2>Moins de paperasse, plus de transit.</h2>
                     <p>La plateforme SaaS dédiée aux transitaires pour gérer vos dossiers, déclarations douanières et cotations en temps réel.</p>
