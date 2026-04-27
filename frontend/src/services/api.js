@@ -310,6 +310,7 @@ export const transportsAPI = {
     getAll: () => api.get('/transports'),
     getOne: (id) => api.get(`/transports/${id}`),
     getByDossier: (dossierId) => api.get(`/transports/dossier/${dossierId}`),
+    save: (data) => api.post('/transports', data),   // upsert — backend handles create vs update
     create: (data) => api.post('/transports', data),
     update: (id, data) => api.put(`/transports/${id}`, data),
     delete: (id) => api.delete(`/transports/${id}`)
