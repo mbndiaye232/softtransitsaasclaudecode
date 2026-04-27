@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { compositionAPI, produitsAPI } from '../../services/api';
+import { compositionAPI, produitsAPI, unitesPoidsAPI, unitesVolumeAPI } from '../../services/api';
 import { Plus, Trash, Save, Box, Package, ChevronRight, Search, AlertCircle, Info, AlertTriangle } from 'lucide-react';
 
 const CompositionTransportManager = ({ dossierId, dossierType }) => {
@@ -16,17 +16,22 @@ const CompositionTransportManager = ({ dossierId, dossierType }) => {
     const [groupageItems, setGroupageItems] = useState([]);
     const [addingGroupage, setAddingGroupage] = useState(false);
 
+    // Units
+    const [unitesPoids, setUnitesPoids] = useState([]);
+    const [unitesVolume, setUnitesVolume] = useState([]);
+
     // Common Forms
     const [containerForm, setContainerForm] = useState({
         NumeroTC: '',
-        TypeTC: '40', // Default 40'
+        TypeTC: '40',
         TareTC: '',
         DimensionTC: '',
-        UnitePoids: 'Kg'
+        UnitePoids: 'Kg',
+        UniteVolume: 'm³'
     });
 
     const [contentForm, setContentForm] = useState({
-        ObjetConteneur: '', // Product name
+        ObjetConteneur: '',
         Quantite: '',
         PoidsTotalNet: '',
         Unite: 'Kg'
@@ -42,6 +47,29 @@ const CompositionTransportManager = ({ dossierId, dossierType }) => {
 
     // Determine view mode
     const isContainerMode = dossierType === 'TC';
+
+    // Load weight and volume units once
+    useEffect(() => {
+        Promise.all([unitesPoidsAPI.getAll(), unitesVolumeAPI.getAll()])
+            .then(([poidsRes, volRes]) => {
+                const poids = poidsRes.data || [];
+                const vol = volRes.data || [];
+                setUnitesPoids(poids);
+                setUnitesVolume(vol);
+                // Set defaults to first available unit
+                if (poids.length > 0) {
+                    const defaultPoids = poids[0].libelle || poids[0].LibelleUnitePoids || 'Kg';
+                    setContainerForm(prev => ({ ...prev, UnitePoids: defaultPoids }));
+                    setContentForm(prev => ({ ...prev, Unite: defaultPoids }));
+                    setGroupageForm(prev => ({ ...prev, UnitePoids: defaultPoids }));
+                }
+                if (vol.length > 0) {
+                    const defaultVol = vol[0].libelle || vol[0].LibelleUnitesVolume || 'm³';
+                    setContainerForm(prev => ({ ...prev, UniteVolume: defaultVol }));
+                }
+            })
+            .catch(err => console.error('Error loading units:', err));
+    }, []);
 
     useEffect(() => {
         if (dossierId) {
@@ -305,11 +333,35 @@ const CompositionTransportManager = ({ dossierId, dossierType }) => {
                                                     value={containerForm.TareTC}
                                                     onChange={e => setContainerForm({ ...containerForm, TareTC: e.target.value })}
                                                 />
+                                                <select
+                                                    className="form-input" style={{ width: '80px', flexShrink: 0 }}
+                                                    value={containerForm.UnitePoids}
+                                                    onChange={e => setContainerForm({ ...containerForm, UnitePoids: e.target.value })}
+                                                    title="Unité de poids"
+                                                >
+                                                    {unitesPoids.length > 0
+                                                        ? unitesPoids.map(u => <option key={u.id || u.IDUnitePoids} value={u.libelle || u.LibelleUnitePoids}>{u.libelle || u.LibelleUnitePoids}</option>)
+                                                        : <option value="Kg">Kg</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                            <div className="form-row">
                                                 <input
-                                                    type="number" className="form-input" placeholder="Volume m3"
+                                                    type="number" className="form-input" placeholder="Volume"
                                                     value={containerForm.DimensionTC}
                                                     onChange={e => setContainerForm({ ...containerForm, DimensionTC: e.target.value })}
                                                 />
+                                                <select
+                                                    className="form-input" style={{ width: '80px', flexShrink: 0 }}
+                                                    value={containerForm.UniteVolume}
+                                                    onChange={e => setContainerForm({ ...containerForm, UniteVolume: e.target.value })}
+                                                    title="Unité de volume"
+                                                >
+                                                    {unitesVolume.length > 0
+                                                        ? unitesVolume.map(u => <option key={u.id || u.IDUnitesVolume} value={u.libelle || u.LibelleUnitesVolume}>{u.libelle || u.LibelleUnitesVolume}</option>)
+                                                        : <option value="m³">m³</option>
+                                                    }
+                                                </select>
                                             </div>
                                             <button type="submit" className="btn-add">Ajouter le TC</button>
                                         </form>
@@ -356,7 +408,7 @@ const CompositionTransportManager = ({ dossierId, dossierType }) => {
                                                         <tr>
                                                             <th>Nature march.</th>
                                                             <th>Quantité</th>
-                                                            <th>Poids (Kg)</th>
+                                                            <th>Poids ({contentForm.Unite || 'Kg'})</th>
                                                             <th></th>
                                                         </tr>
                                                     </thead>
@@ -405,7 +457,17 @@ const CompositionTransportManager = ({ dossierId, dossierType }) => {
                                                             value={contentForm.PoidsTotalNet}
                                                             onChange={e => setContentForm({ ...contentForm, PoidsTotalNet: e.target.value })}
                                                         />
-                                                        <span style={{ padding: '0.5rem', color: '#64748b', fontSize: '0.875rem' }}>Kg</span>
+                                                        <select
+                                                            className="form-input" style={{ width: '80px', flexShrink: 0 }}
+                                                            value={contentForm.Unite}
+                                                            onChange={e => setContentForm({ ...contentForm, Unite: e.target.value })}
+                                                            title="Unité de poids"
+                                                        >
+                                                            {unitesPoids.length > 0
+                                                                ? unitesPoids.map(u => <option key={u.id || u.IDUnitePoids} value={u.libelle || u.LibelleUnitePoids}>{u.libelle || u.LibelleUnitePoids}</option>)
+                                                                : <option value="Kg">Kg</option>
+                                                            }
+                                                        </select>
                                                     </div>
                                                     <button type="submit" className="btn-add">Valider</button>
                                                 </form>
@@ -432,7 +494,7 @@ const CompositionTransportManager = ({ dossierId, dossierType }) => {
                                     <thead>
                                         <tr>
                                             <th>Nature des marchandises</th>
-                                            <th>Poids (Kg)</th>
+                                            <th>Poids ({groupageForm.UnitePoids || 'Kg'})</th>
                                             <th>Tarif</th>
                                             <th>Total</th>
                                             <th></th>
@@ -442,7 +504,7 @@ const CompositionTransportManager = ({ dossierId, dossierType }) => {
                                         {groupageItems.map(item => (
                                             <tr key={item.IDGroupage}>
                                                 <td>{item.NatureEtQuantiteDesMarchandises}</td>
-                                                <td>{item.PoidsTaxation}</td>
+                                                <td>{item.PoidsTaxation} {item.UnitePoids || ''}</td>
                                                 <td>{item.TarifMontant}</td>
                                                 <td>{item.Total}</td>
                                                 <td className="action-cell">
@@ -475,6 +537,17 @@ const CompositionTransportManager = ({ dossierId, dossierType }) => {
                                             value={groupageForm.PoidsTaxation}
                                             onChange={e => setGroupageForm({ ...groupageForm, PoidsTaxation: e.target.value })}
                                         />
+                                        <select
+                                            className="form-input" style={{ width: '80px', flexShrink: 0 }}
+                                            value={groupageForm.UnitePoids}
+                                            onChange={e => setGroupageForm({ ...groupageForm, UnitePoids: e.target.value })}
+                                            title="Unité de poids"
+                                        >
+                                            {unitesPoids.length > 0
+                                                ? unitesPoids.map(u => <option key={u.id || u.IDUnitePoids} value={u.libelle || u.LibelleUnitePoids}>{u.libelle || u.LibelleUnitePoids}</option>)
+                                                : <option value="Kg">Kg</option>
+                                            }
+                                        </select>
                                         <input
                                             type="number" className="form-input" placeholder="Tarif/Montant"
                                             value={groupageForm.TarifMontant}

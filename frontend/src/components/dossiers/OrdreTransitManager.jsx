@@ -112,8 +112,8 @@ const OrdreTransitManager = ({ dossierId }) => {
                 currentDoc.Recu = currentDoc.Recu ? 0 : 1;
                 if (currentDoc.Recu) {
                     currentDoc.Aremettre = 0; // Decocher "À remettre"
-                    // Initialiser avec la date et l'heure système
-                    currentDoc.DateReceptionDocument = new Date().toISOString().slice(0, 16);
+                    // Initialiser avec la date et l'heure système (format MySQL)
+                    currentDoc.DateReceptionDocument = new Date().toISOString().replace('T', ' ').slice(0, 19);
                 } else {
                     currentDoc.Aremettre = 1; // Recocher "À remettre"
                     currentDoc.DateReceptionDocument = null; // Réinitialiser la date
@@ -151,8 +151,10 @@ const OrdreTransitManager = ({ dossierId }) => {
             await fetchData();
             setShowForm(false);
         } catch (err) {
-            console.error('Error saving OT:', err);
-            alert('Erreur lors de l\'enregistrement de l\'OT');
+            const status = err.response?.status;
+            const detail = err.response?.data?.error || err.response?.data?.details || err.message;
+            console.error('Error saving OT:', status, detail, err);
+            alert(`Erreur lors de l'enregistrement de l'OT (${status || 'réseau'}): ${detail || 'voir la console'}`);
         } finally {
             setSubmitting(false);
         }

@@ -20,8 +20,5 @@
     }
   ],
 
-  // Limites worker (plan gratuit : 10ms CPU / 128MB)
-  "limits": {
-    "cpu_ms": 50
-  }
+  // Note: les limites CPU (limits.cpu_ms) nécessitent un plan payant — retirées pour le plan gratuit
 }

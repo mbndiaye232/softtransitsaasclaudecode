@@ -65,7 +65,10 @@ router.post('/', checkPermission('DOSSIERS', 'can_edit'), async (req, res) => {
         } = req.body;
 
         // Convert empty strings to NULL for UNIQUE columns
-        const Numeserie = req.body.Numeserie || null;
+        const rawNumeserie = req.body.Numeserie;
+        const Numeserie = rawNumeserie && String(rawNumeserie).trim() !== '' ? String(rawNumeserie).trim() : null;
+        // Normalize date fields: strip time portion from ISO timestamps, convert empty → null
+        const safeDate = (d) => d && String(d).trim() !== '' ? String(d).split('T')[0] : null;
 
         // 1. Delete existing contents for this CodeOrdreTransport if any
         await connection.query(
@@ -106,9 +109,9 @@ router.post('/', checkPermission('DOSSIERS', 'can_edit'), async (req, res) => {
                     sectionlivraison = ?, sectioncontremaitre = ?
                 WHERE IDOrdresDeTransport = ?`,
                 [
-                    DateOrdreTransport || new Date(), TransporteuretAdresse, Introduction, BL,
+                    safeDate(DateOrdreTransport) || new Date(), TransporteuretAdresse, Introduction, BL,
                     AdresseDeLivraison, CodeDossier, Numeserie, NumDeclaration,
-                    DateDeclaration || null, Pregate, CodeOrdreTransit, forùulepolitesse,
+                    safeDate(DateDeclaration), Pregate, CodeOrdreTransit, forùulepolitesse,
                     sectionlivraison, sectioncontremaitre,
                     existing[0].IDOrdresDeTransport
                 ]
@@ -123,9 +126,9 @@ router.post('/', checkPermission('DOSSIERS', 'can_edit'), async (req, res) => {
                     forùulepolitesse, sectionlivraison, sectioncontremaitre
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
-                    IDDossiers, CodeOrdreTransport, DateOrdreTransport || new Date(), TransporteuretAdresse,
+                    IDDossiers, CodeOrdreTransport, safeDate(DateOrdreTransport) || new Date(), TransporteuretAdresse,
                     Introduction, BL, AdresseDeLivraison, CodeDossier, Numeserie,
-                    NumDeclaration, DateDeclaration || null, Pregate, CodeOrdreTransit,
+                    NumDeclaration, safeDate(DateDeclaration), Pregate, CodeOrdreTransit,
                     forùulepolitesse, sectionlivraison, sectioncontremaitre
                 ]
             );

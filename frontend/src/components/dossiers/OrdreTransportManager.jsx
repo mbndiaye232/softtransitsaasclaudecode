@@ -126,13 +126,13 @@ const OrdreTransportManager = ({ dossierId }) => {
             setBlInfo(blRes.data);
             setDeclarations(declRes.data);
 
-            // Set initial code
+            // Set initial code — Numeserie left empty (unique per OTR, user fills manually)
             const seq = (ordersRes.data.length + 1).toString().padStart(2, '0');
             setFormData(prev => ({
                 ...prev,
                 CodeOrdreTransport: `OTR-${dossierId}-${seq}`,
                 AdresseDeLivraison: blRes.data?.AdresseLivraisonFinale || '',
-                Numeserie: otRes.data?.NumeroSerie || '',
+                Numeserie: '',
                 Introduction: `Messieurs,\nSuite aux instructions reçues de notre client, nous vous demandons de bien vouloir livrer les conteneurs repris chi-après :`
             }));
 
@@ -203,8 +203,10 @@ const OrdreTransportManager = ({ dossierId }) => {
             setSelectedCarrier(null);
 
         } catch (err) {
-            console.error('Error saving OT:', err);
-            alert('Erreur lors de l\'enregistrement.');
+            const status = err.response?.status;
+            const detail = err.response?.data?.error || err.response?.data?.details || err.message;
+            console.error('Error saving OT:', status, detail, err);
+            alert(`Erreur lors de l'enregistrement (${status || 'réseau'}): ${detail || 'voir la console'}`);
         } finally {
             setSaving(false);
         }
