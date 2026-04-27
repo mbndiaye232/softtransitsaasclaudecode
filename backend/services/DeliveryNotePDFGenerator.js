@@ -64,7 +64,7 @@ class DeliveryNotePDFGenerator {
                  LEFT JOIN dossiers d ON o.IDDossiers = d.IDDossiers
                  LEFT JOIN clients c ON d.IDCLIENTS = c.IDCLIENTS
                  LEFT JOIN billoflading bl ON d.IDDossiers = bl.idbl
-                 LEFT JOIN ordresTransit ot ON d.IDDossiers = ot.IDDossiers
+                 LEFT JOIN ordrestransit ot ON d.IDDossiers = ot.IDDossiers
                  WHERE o.IDOrdresDeTransport = ?`,
                 [otrId]
             );

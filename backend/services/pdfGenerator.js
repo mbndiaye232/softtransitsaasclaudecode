@@ -123,7 +123,7 @@ class NoteDetailPDFGenerator {
             const [declarants] = await connection.query(
                 `SELECT a.NomAgent 
                  FROM agents a
-                 JOIN LiaisonDossiersDeclarants ld ON a.IDAgents = ld.idDeclarants
+                 JOIN liaisondossiersdeclarants ld ON a.IDAgents = ld.idDeclarants
                  WHERE ld.IDDossiers = ?`,
                 [note.IDDossiers]
             );
