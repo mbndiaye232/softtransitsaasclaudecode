@@ -115,7 +115,13 @@ router.post('/', checkPermission('DOSSIERS', 'can_create'), async (req, res) => 
 
         // Normalize FK fields: empty string → null to avoid FK constraint violations
         const safeIncoterm = Idincoterms && Number(Idincoterms) > 0 ? Number(Idincoterms) : null;
-        const safeDate = (d) => d && d.trim() !== '' ? d : null;
+        const safeDate = (d) => d && String(d).trim() !== '' ? String(d).split('T')[0] : null;
+        const safeTimestamp = (d) => {
+            if (!d || String(d).trim() === '') return null;
+            // Normalize ISO format (T → space, trim to seconds)
+            return String(d).replace('T', ' ').slice(0, 19);
+        };
+        const safeDocType = (id) => id && Number(id) > 0 ? Number(id) : null;
 
         console.log('Data to insert:', { NumeroOT, IDDossiers, structur_id: req.user.structur_id, Idincoterms: safeIncoterm });
 
@@ -151,14 +157,16 @@ router.post('/', checkPermission('DOSSIERS', 'can_create'), async (req, res) => 
         // Documents
         if (documents && Array.isArray(documents)) {
             for (const doc of documents) {
+                const docTypeId = safeDocType(doc.idtypesDocumentot);
+                if (!docTypeId) continue; // Skip docs with invalid type ID (FK would fail)
                 await connection.query(`
                     INSERT INTO liaisonotdocumentsaremettre (
                         IDOrdreTransit, idtypesDocumentot, Observations, Recu,
                         DateReceptionDocument, Aremettre, LibelleDocument
                     ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 `, [
-                    otId, doc.idtypesDocumentot, doc.Observations, doc.Recu || 0,
-                    doc.DateReceptionDocument, doc.Aremettre || 0, doc.LibelleDocument
+                    otId, docTypeId, doc.Observations || null, doc.Recu || 0,
+                    safeTimestamp(doc.DateReceptionDocument), doc.Aremettre || 0, doc.LibelleDocument || null
                 ]);
             }
         }
@@ -197,7 +205,12 @@ router.put('/:id', checkPermission('DOSSIERS', 'can_edit'), async (req, res) => 
 
         // Normalize FK fields: empty string → null to avoid FK constraint violations
         const safeIncoterm = Idincoterms && Number(Idincoterms) > 0 ? Number(Idincoterms) : null;
-        const safeDate = (d) => d && d.trim() !== '' ? d : null;
+        const safeDate = (d) => d && String(d).trim() !== '' ? String(d).split('T')[0] : null;
+        const safeTimestamp = (d) => {
+            if (!d || String(d).trim() === '') return null;
+            return String(d).replace('T', ' ').slice(0, 19);
+        };
+        const safeDocType = (id) => id && Number(id) > 0 ? Number(id) : null;
 
         // Update main record
         await connection.query(`
@@ -231,14 +244,16 @@ router.put('/:id', checkPermission('DOSSIERS', 'can_edit'), async (req, res) => 
         await connection.query('DELETE FROM liaisonotdocumentsaremettre WHERE IDOrdreTransit = ?', [otId]);
         if (documents && Array.isArray(documents)) {
             for (const doc of documents) {
+                const docTypeId = safeDocType(doc.idtypesDocumentot);
+                if (!docTypeId) continue; // Skip docs with invalid type ID (FK would fail)
                 await connection.query(`
                     INSERT INTO liaisonotdocumentsaremettre (
                         IDOrdreTransit, idtypesDocumentot, Observations, Recu,
                         DateReceptionDocument, Aremettre, LibelleDocument
                     ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 `, [
-                    otId, doc.idtypesDocumentot, doc.Observations, doc.Recu || 0,
-                    doc.DateReceptionDocument, doc.Aremettre || 0, doc.LibelleDocument
+                    otId, docTypeId, doc.Observations || null, doc.Recu || 0,
+                    safeTimestamp(doc.DateReceptionDocument), doc.Aremettre || 0, doc.LibelleDocument || null
                 ]);
             }
         }

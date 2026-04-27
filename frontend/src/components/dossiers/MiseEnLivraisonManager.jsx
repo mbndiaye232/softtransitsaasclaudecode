@@ -81,8 +81,10 @@ const MiseEnLivraisonManager = ({ dossierId }) => {
             alert('Données enregistrées avec succès');
             fetchData();
         } catch (err) {
-            console.error('Error saving delivery data:', err);
-            alert('Erreur lors de l’enregistrement');
+            const status = err.response?.status;
+            const detail = err.response?.data?.error || err.response?.data?.details || err.message;
+            console.error(‘Error saving delivery data:’, status, detail, err);
+            alert(`Erreur lors de l’enregistrement (${status || ‘réseau’}): ${detail || ‘voir la console’}`);
         } finally {
             setSubmitting(false);
         }
