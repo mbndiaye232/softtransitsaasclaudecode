@@ -201,7 +201,7 @@ router.post('/', checkPermission('CLIENTS', 'can_create'), uploader.single('Chem
 
         // Create Account (ComptesClients)
         await connection.query(
-            `INSERT INTO ComptesClients (
+            `INSERT INTO comptesclients (
                 LibelleCompteClients, IDCLIENTS, IdAgent, SoldeCompteClient, TotalCredit, TotalDebit
             ) VALUES (?, ?, ?, 0, 0, 0)`,
             [`Compte opérations de ${NomRS}`, clientId, IdAgent]

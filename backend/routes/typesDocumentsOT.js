@@ -23,7 +23,7 @@ router.post('/', checkPermission('CONFIG', 'can_create'), async (req, res) => {
     const { LibelleTypeDocumentsOT, Observations } = req.body;
     try {
         const [result] = await pool.query(
-            'INSERT INTO TypesDocumentsOT (LibelleTypeDocumentsOT, Observations) VALUES (?, ?)',
+            'INSERT INTO typesdocumentsot (LibelleTypeDocumentsOT, Observations) VALUES (?, ?)',
             [LibelleTypeDocumentsOT, Observations]
         );
         res.status(201).json({ id: result.insertId });

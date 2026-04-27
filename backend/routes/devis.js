@@ -90,7 +90,7 @@ router.post('/', async (req, res) => {
         ]);
 
         await connection.query(
-            `INSERT INTO LiaisonCotationsRubriques
+            `INSERT INTO liaisoncotationsrubriques
                 (IDRubriques, IDCotation, MontantHTCotation, CodeRubrique, libelleRubrique, Complement)
              VALUES ?`,
             [liaisonValues]

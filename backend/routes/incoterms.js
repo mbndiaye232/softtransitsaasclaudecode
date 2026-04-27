@@ -23,7 +23,7 @@ router.post('/', checkPermission('CONFIG', 'can_create'), async (req, res) => {
     const { CodeIncoterm, Observations } = req.body;
     try {
         const [result] = await pool.query(
-            'INSERT INTO Incoterm (CodeIncoterm, Observations) VALUES (?, ?)',
+            'INSERT INTO incoterm (CodeIncoterm, Observations) VALUES (?, ?)',
             [CodeIncoterm, Observations]
         );
         res.status(201).json({ id: result.insertId });

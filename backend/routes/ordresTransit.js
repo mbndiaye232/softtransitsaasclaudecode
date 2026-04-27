@@ -135,7 +135,7 @@ router.post('/', checkPermission('DOSSIERS', 'can_create'), async (req, res) => 
         if (regimeIds && Array.isArray(regimeIds)) {
             for (const rId of regimeIds) {
                 await connection.query(
-                    'INSERT INTO LiaisonRegimeOT (IDOrdresTransit, IDRegimeOT) VALUES (?, ?)',
+                    'INSERT INTO liaisonregimeot (IDOrdresTransit, IDRegimeOT) VALUES (?, ?)',
                     [otId, rId]
                 );
             }
@@ -145,8 +145,8 @@ router.post('/', checkPermission('DOSSIERS', 'can_create'), async (req, res) => 
         if (documents && Array.isArray(documents)) {
             for (const doc of documents) {
                 await connection.query(`
-                    INSERT INTO LiaisonOTDocumentsARemettre (
-                        IDOrdreTransit, idtypesDocumentot, Observations, Recu, 
+                    INSERT INTO liaisonotdocumentsaremettre (
+                        IDOrdreTransit, idtypesDocumentot, Observations, Recu,
                         DateReceptionDocument, Aremettre, LibelleDocument
                     ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 `, [
@@ -210,7 +210,7 @@ router.put('/:id', checkPermission('DOSSIERS', 'can_edit'), async (req, res) => 
         if (regimeIds && Array.isArray(regimeIds)) {
             for (const rId of regimeIds) {
                 await connection.query(
-                    'INSERT INTO LiaisonRegimeOT (IDOrdresTransit, IDRegimeOT) VALUES (?, ?)',
+                    'INSERT INTO liaisonregimeot (IDOrdresTransit, IDRegimeOT) VALUES (?, ?)',
                     [otId, rId]
                 );
             }
@@ -221,8 +221,8 @@ router.put('/:id', checkPermission('DOSSIERS', 'can_edit'), async (req, res) => 
         if (documents && Array.isArray(documents)) {
             for (const doc of documents) {
                 await connection.query(`
-                    INSERT INTO LiaisonOTDocumentsARemettre (
-                        IDOrdreTransit, idtypesDocumentot, Observations, Recu, 
+                    INSERT INTO liaisonotdocumentsaremettre (
+                        IDOrdreTransit, idtypesDocumentot, Observations, Recu,
                         DateReceptionDocument, Aremettre, LibelleDocument
                     ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 `, [
