@@ -40,8 +40,14 @@ const CotationManager = ({ dossierId }) => {
             ]);
             setCotations(cotRes.data);
 
-            // Filter agents who are "Déclarants" (IDGroupes === 10)
-            const declarants = agentsRes.data.filter(a => a.id_groupe === 10 || a.IDGroupes === 10);
+            // Filter agents whose group name contains "déclarant" (case-insensitive)
+            // or who have the DECLARANT role — avoids hardcoding a group ID
+            const declarants = agentsRes.data.filter(a => {
+                const grp = (a.group_name || a.LibelleGroupe || '').toLowerCase();
+                const role = (a.role || a.FonctionAgent || '').toLowerCase();
+                return grp.includes('déclarant') || grp.includes('declarant')
+                    || role.includes('déclarant') || role.includes('declarant');
+            });
             setAgents(declarants);
         } catch (err) {
             console.error('Error fetching cotation data:', err);
@@ -190,7 +196,7 @@ const CotationManager = ({ dossierId }) => {
                                         <option value="">Choisir un agent...</option>
                                         {agents.map(agent => (
                                             <option key={agent.id} value={agent.id}>
-                                                {agent.NomAgent || agent.name}
+                                                {agent.name || agent.NomAgent}
                                             </option>
                                         ))}
                                     </select>
