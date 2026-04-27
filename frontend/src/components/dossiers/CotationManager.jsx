@@ -36,19 +36,10 @@ const CotationManager = ({ dossierId }) => {
             setLoading(true);
             const [cotRes, agentsRes] = await Promise.all([
                 cotationsAPI.getByDossier(dossierId),
-                usersAPI.getAll()
+                usersAPI.getDeclarants()          // dedicated endpoint — no client-side filtering
             ]);
             setCotations(cotRes.data);
-
-            // Filter agents whose group name contains "déclarant" (case-insensitive)
-            // or who have the DECLARANT role — avoids hardcoding a group ID
-            const declarants = agentsRes.data.filter(a => {
-                const grp = (a.group_name || a.LibelleGroupe || '').toLowerCase();
-                const role = (a.role || a.FonctionAgent || '').toLowerCase();
-                return grp.includes('déclarant') || grp.includes('declarant')
-                    || role.includes('déclarant') || role.includes('declarant');
-            });
-            setAgents(declarants);
+            setAgents(agentsRes.data);
         } catch (err) {
             console.error('Error fetching cotation data:', err);
         } finally {

@@ -123,6 +123,35 @@ router.put('/:id/permissions', checkPermission('AGENTS', 'can_edit'), async (req
 });
 
 /**
+ * GET /api/users/declarants
+ * Return active agents whose group name contains "declarant" (any case/accent)
+ * Used by CotationManager to populate the assignee dropdown
+ */
+router.get('/declarants', authMiddleware, tenantMiddleware, async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            `SELECT a.IDAgents as id, a.NomAgent as name, g.LibelleGroupe as group_name
+             FROM agents a
+             LEFT JOIN groupes g ON a.IDGroupes = g.IDGroupes
+             WHERE a.structur_id = ?
+               AND a.is_active = 1
+               AND (
+                   g.LibelleGroupe LIKE '%éclarant%'
+                   OR g.LibelleGroupe LIKE '%eclarant%'
+                   OR a.FonctionAgent LIKE '%éclarant%'
+                   OR a.FonctionAgent LIKE '%eclarant%'
+               )
+             ORDER BY a.NomAgent`,
+            [req.structur_id]
+        );
+        res.json(rows);
+    } catch (err) {
+        console.error('Get declarants error:', err);
+        res.status(500).json({ error: 'Failed to fetch declarants' });
+    }
+});
+
+/**
  * GET /api/users
  * List all users for the current company (or all for provider)
  */

@@ -86,6 +86,7 @@ export const groupesAPI = {
 
 export const usersAPI = {
     getAll: () => api.get('/users'),
+    getDeclarants: () => api.get('/users/declarants'),
     getOne: (id) => api.get(`/users/${id}`),
     create: (data) => api.post('/users', data),
     update: (id, data) => api.put(`/users/${id}`, data),
