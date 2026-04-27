@@ -36,12 +36,14 @@ const CotationManager = ({ dossierId }) => {
             setLoading(true);
             const [cotRes, agentsRes] = await Promise.all([
                 cotationsAPI.getByDossier(dossierId),
-                usersAPI.getDeclarants()          // dedicated endpoint — no client-side filtering
+                usersAPI.getDeclarants()
             ]);
             setCotations(cotRes.data);
-            setAgents(agentsRes.data);
+            const list = Array.isArray(agentsRes.data) ? agentsRes.data : [];
+            setAgents(list);
+            console.log('[CotationManager] declarants loaded:', list.length, list);
         } catch (err) {
-            console.error('Error fetching cotation data:', err);
+            console.error('[CotationManager] Error fetching cotation data:', err);
         } finally {
             setLoading(false);
         }
@@ -184,10 +186,13 @@ const CotationManager = ({ dossierId }) => {
                                         value={form.agent_id}
                                         onChange={(e) => setForm({ ...form, agent_id: e.target.value })}
                                     >
-                                        <option value="">Choisir un agent...</option>
+                                        <option value="">
+                                            {agents.length === 0 ? '⚠ Aucun déclarant trouvé' : 'Choisir un agent...'}
+                                        </option>
                                         {agents.map(agent => (
                                             <option key={agent.id} value={agent.id}>
                                                 {agent.name || agent.NomAgent}
+                                                {agent.group_name ? ` (${agent.group_name})` : ''}
                                             </option>
                                         ))}
                                     </select>

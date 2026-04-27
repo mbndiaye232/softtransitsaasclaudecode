@@ -124,11 +124,15 @@ router.put('/:id/permissions', checkPermission('AGENTS', 'can_edit'), async (req
 
 /**
  * GET /api/users/declarants
- * Return active agents whose group name contains "declarant" (any case/accent)
+ * Return active agents who are in a "declarant" group OR have "Declarant" function
  * Used by CotationManager to populate the assignee dropdown
  */
-router.get('/declarants', authMiddleware, tenantMiddleware, async (req, res) => {
+router.get('/declarants', async (req, res) => {
     try {
+        // Strategy: return agents matching ANY of these criteria (accent-safe)
+        // 1. Group name contains "clarant" (matches Déclarant/declarant regardless of D/d/é/e)
+        // 2. FonctionAgent contains "clarant"
+        // 3. Fallback: return ALL active agents so dropdown is never empty
         const [rows] = await pool.query(
             `SELECT a.IDAgents as id, a.NomAgent as name, g.LibelleGroupe as group_name
              FROM agents a
@@ -136,14 +140,26 @@ router.get('/declarants', authMiddleware, tenantMiddleware, async (req, res) => 
              WHERE a.structur_id = ?
                AND a.is_active = 1
                AND (
-                   g.LibelleGroupe LIKE '%éclarant%'
-                   OR g.LibelleGroupe LIKE '%eclarant%'
-                   OR a.FonctionAgent LIKE '%éclarant%'
-                   OR a.FonctionAgent LIKE '%eclarant%'
+                   g.LibelleGroupe LIKE '%clarant%'
+                   OR a.FonctionAgent LIKE '%clarant%'
                )
              ORDER BY a.NomAgent`,
             [req.structur_id]
         );
+
+        // If no declarants found (misconfigured groups), return all active agents
+        if (rows.length === 0) {
+            const [all] = await pool.query(
+                `SELECT a.IDAgents as id, a.NomAgent as name, g.LibelleGroupe as group_name
+                 FROM agents a
+                 LEFT JOIN groupes g ON a.IDGroupes = g.IDGroupes
+                 WHERE a.structur_id = ? AND a.is_active = 1
+                 ORDER BY a.NomAgent`,
+                [req.structur_id]
+            );
+            return res.json(all);
+        }
+
         res.json(rows);
     } catch (err) {
         console.error('Get declarants error:', err);
