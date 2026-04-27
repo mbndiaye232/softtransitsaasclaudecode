@@ -37,6 +37,8 @@ router.post('/', checkPermission('DOSSIERS', 'can_edit'), async (req, res) => {
         IDDossiers,
         DateMiseEnLivraison,
         DateRemiseContremaitre,
+        DateRetourConteneur,
+        DateEffectiveLivraison,
         Idcontremaitre,
         observationsML,
         Pregate
@@ -63,7 +65,7 @@ router.post('/', checkPermission('DOSSIERS', 'can_edit'), async (req, res) => {
                     DateRemiseContremaitre || null,
                     DateRetourConteneur || null,
                     DateEffectiveLivraison || null,
-                    Idcontremaitre || 0,
+                    Idcontremaitre || null,
                     observationsML || '',
                     Pregate || '',
                     IDDossiers
@@ -89,7 +91,7 @@ router.post('/', checkPermission('DOSSIERS', 'can_edit'), async (req, res) => {
                     DateRemiseContremaitre || null,
                     DateRetourConteneur || null,
                     DateEffectiveLivraison || null,
-                    Idcontremaitre || 0,
+                    Idcontremaitre || null,
                     observationsML || '',
                     Pregate || ''
                 ]
