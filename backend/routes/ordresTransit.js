@@ -113,7 +113,11 @@ router.post('/', checkPermission('DOSSIERS', 'can_create'), async (req, res) => 
             regimeIds, documents
         } = req.body;
 
-        console.log('Data to insert:', { NumeroOT, IDDossiers, structur_id: req.user.structur_id });
+        // Normalize FK fields: empty string → null to avoid FK constraint violations
+        const safeIncoterm = Idincoterms && Number(Idincoterms) > 0 ? Number(Idincoterms) : null;
+        const safeDate = (d) => d && d.trim() !== '' ? d : null;
+
+        console.log('Data to insert:', { NumeroOT, IDDossiers, structur_id: req.user.structur_id, Idincoterms: safeIncoterm });
 
         const [result] = await connection.query(`
             INSERT INTO ordrestransit (
@@ -123,10 +127,13 @@ router.post('/', checkPermission('DOSSIERS', 'can_create'), async (req, res) => 
                 Nbredecolis, PoidsNet, ValeurMarchandise, structur_id
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
-            NumeroOT, DateOT, DateReceptionOT, req.user.id, IDDossiers, NumeroSerie,
-            Idincoterms, BSCExiste || 0, AssuranceExiste || 0, Observations,
-            DateExpedition, AdresseDeLivraison, PROVENANCE, NatureProduits,
-            Nbredecolis, PoidsNet, ValeurMarchandise, req.user.structur_id
+            NumeroOT || null, safeDate(DateOT), safeDate(DateReceptionOT),
+            req.user.id, IDDossiers, NumeroSerie || null,
+            safeIncoterm, BSCExiste ? 1 : 0, AssuranceExiste ? 1 : 0,
+            Observations || null, safeDate(DateExpedition),
+            AdresseDeLivraison || null, PROVENANCE || null, NatureProduits || null,
+            Nbredecolis || null, PoidsNet || null, ValeurMarchandise || null,
+            req.user.structur_id
         ]);
 
         const otId = result.insertId;
@@ -188,9 +195,13 @@ router.put('/:id', checkPermission('DOSSIERS', 'can_edit'), async (req, res) => 
 
         const otId = req.params.id;
 
+        // Normalize FK fields: empty string → null to avoid FK constraint violations
+        const safeIncoterm = Idincoterms && Number(Idincoterms) > 0 ? Number(Idincoterms) : null;
+        const safeDate = (d) => d && d.trim() !== '' ? d : null;
+
         // Update main record
         await connection.query(`
-            UPDATE ordrestransit SET 
+            UPDATE ordrestransit SET
                 NumeroOT = ?, DateOT = ?, DateReceptionOT = ?, IDDossiers = ?, NumeroSerie = ?,
                 Idincoterms = ?, BSCExiste = ?, AssuranceExiste = ?, Observations = ?,
                 DateExpedition = ?, AdresseDeLivraison = ?, PROVENANCE = ?, NatureProduits = ?,
@@ -198,10 +209,10 @@ router.put('/:id', checkPermission('DOSSIERS', 'can_edit'), async (req, res) => 
                 structur_id = ?
             WHERE IDOrdresTransit = ?
         `, [
-            NumeroOT, DateOT, DateReceptionOT, IDDossiers, NumeroSerie,
-            Idincoterms, BSCExiste || 0, AssuranceExiste || 0, Observations,
-            DateExpedition, AdresseDeLivraison, PROVENANCE, NatureProduits,
-            Nbredecolis, PoidsNet, ValeurMarchandise,
+            NumeroOT || null, safeDate(DateOT), safeDate(DateReceptionOT), IDDossiers, NumeroSerie || null,
+            safeIncoterm, BSCExiste ? 1 : 0, AssuranceExiste ? 1 : 0, Observations || null,
+            safeDate(DateExpedition), AdresseDeLivraison || null, PROVENANCE || null, NatureProduits || null,
+            Nbredecolis || null, PoidsNet || null, ValeurMarchandise || null,
             req.user.structur_id, otId
         ]);
 
