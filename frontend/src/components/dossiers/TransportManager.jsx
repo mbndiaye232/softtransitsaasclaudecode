@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { transportsAPI, structureAPI, lieuxAPI, tiersAPI, moyensTransportAPI } from '../../services/api';
 import { Save, Truck, Calendar, MapPin, Anchor, Clock, FileText, Search, ChevronDown, Building2 } from 'lucide-react';
 
@@ -196,6 +196,23 @@ const TransportManager = ({ dossierId }) => {
 
     }, [form.transportType, form.IDCompagnie, allMoyens]);
 
+    // Filter companies (tiers) by transport type using activity_labels
+    const filteredTiers = useMemo(() => {
+        if (!tiers.length) return tiers;
+        const keywords = {
+            1: ['maritime', 'mari'],
+            2: ['aérien', 'aerien', 'aer'],
+            3: ['terrestre', 'terr', 'route', 'routier']
+        }[form.transportType] || [];
+
+        const filtered = tiers.filter(t => {
+            const labels = (t.activity_labels || '').toLowerCase();
+            return keywords.some(kw => labels.includes(kw));
+        });
+
+        // Fallback: show all tiers if none match (e.g. activities not configured)
+        return filtered.length > 0 ? filtered : tiers;
+    }, [tiers, form.transportType]);
 
     const showMsg = (text, type = 'info') => {
         setMessage({ text, type });
@@ -383,9 +400,9 @@ const TransportManager = ({ dossierId }) => {
                     </div>
 
                     <SearchableSelect
-                        label="Compagnie de Transport"
+                        label={`Compagnie de Transport${filteredTiers.length < tiers.length ? ` (${filteredTiers.length} ${form.transportType === 1 ? 'maritime' : form.transportType === 2 ? 'aérienne' : 'terrestre'}s)` : ''}`}
                         icon={Building2}
-                        options={tiers}
+                        options={filteredTiers}
                         value={form.IDCompagnie}
                         onChange={(val) => handleSelectChange('IDCompagnie', val)}
                         displayKey="libtier"
