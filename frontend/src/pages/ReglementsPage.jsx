@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
     CreditCard, Users, FileText, CheckCircle2, AlertCircle, X, Search, DollarSign, ListChecks
 } from 'lucide-react';
@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 
 export default function ReglementsPage() {
     const navigate = useNavigate();
+    const location = useLocation();
     const { user, logout } = useAuth();
 
     // Data states
@@ -34,6 +35,15 @@ export default function ReglementsPage() {
     useEffect(() => {
         loadInitialData();
     }, []);
+
+    // Auto-sélectionner le client si on vient d'un dossier
+    useEffect(() => {
+        const preselectedClientId = location.state?.preselectedClientId;
+        if (preselectedClientId && clients.length > 0 && !selectedClient) {
+            const client = clients.find(c => c.IDCLIENTS === preselectedClientId || String(c.IDCLIENTS) === String(preselectedClientId));
+            if (client) handleClientSelect(client);
+        }
+    }, [clients, location.state]);
 
     const loadInitialData = async () => {
         try {

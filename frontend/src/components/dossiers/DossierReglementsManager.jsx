@@ -55,7 +55,7 @@ export default function DossierReglementsManager({ dossierId }) {
 
     useEffect(() => { load(); }, [dossierId]);
 
-    const unpaidFactures = factures.filter(f => Number(f.ReliquatFacture || 0) > 0 && Number(f.Validee) === 1);
+    const unpaidFactures = factures.filter(f => Number(f.ReliquatFacture || 0) > 0);
     const totalSelected = unpaidFactures
         .filter(f => selectedFactures.includes(f.IDFactures))
         .reduce((s, f) => s + Number(f.ReliquatFacture || 0), 0);
@@ -217,7 +217,7 @@ export default function DossierReglementsManager({ dossierId }) {
                 </div>
             ) : (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-                    <button onClick={() => navigate('/reglements')}
+                    <button onClick={() => navigate('/reglements', { state: { preselectedClientId: clientId } })}
                         style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, border: '1px solid #e5e7eb', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: '#374151', background: 'white', boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
                         <ExternalLink size={14} /> Saisie complète des règlements
                     </button>
