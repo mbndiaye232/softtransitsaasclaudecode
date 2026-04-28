@@ -13,6 +13,7 @@ import BordereauLivraisonManager from '../components/dossiers/BordereauLivraison
 import FacturationManager from '../components/dossiers/FacturationManager';
 import DevisManager from '../components/dossiers/DevisManager';
 import FacturesTiersManager from '../components/dossiers/FacturesTiersManager';
+import DossierReglementsManager from '../components/dossiers/DossierReglementsManager';
 import {
     Save, X, Link as LinkIcon, FileText, User, Phone, Mail, Info,
     Settings, CheckCircle, Building2, Briefcase, FileSearch,
@@ -81,6 +82,7 @@ const DossierEdit = () => {
         { id: 'devis',              label: 'Devis',          icon: <FileCheck2 size={13} /> },
         { id: 'factures_tiers',     label: 'Factures Tiers', icon: <Building2 size={13} /> },
         { id: 'facturation',        label: 'Facturation',    icon: <CreditCard size={13} /> },
+        { id: 'reglements',         label: 'Règlements',     icon: <CheckCircle size={13} /> },
     ];
 
     useEffect(() => {
@@ -213,7 +215,7 @@ const DossierEdit = () => {
 
                 {/* ── Tab bar ── */}
                 <div style={{
-                    display:'flex', flexWrap:'wrap', gap:3, background:'white', padding:5, borderRadius:16,
+                    display:'flex', flexWrap:'wrap', gap:4, background:'white', padding:6, borderRadius:16,
                     border:'1px solid #e5e7eb', boxShadow:'0 8px 24px rgba(0,0,0,.10)',
                     marginBottom:24,
                 }}>
@@ -226,9 +228,9 @@ const DossierEdit = () => {
                                 type="button"
                                 onClick={() => setActiveTab(tab.id)}
                                 style={{
-                                    display:'flex', alignItems:'center', gap:5,
-                                    padding:'7px 10px', borderRadius:10, border:'none', cursor:'pointer',
-                                    fontSize:11, fontWeight:700, whiteSpace:'nowrap',
+                                    display:'flex', alignItems:'center', gap:6,
+                                    padding:'9px 14px', borderRadius:10, border:'none', cursor:'pointer',
+                                    fontSize:13, fontWeight:700, whiteSpace:'nowrap',
                                     transition:'all .15s',
                                     background: isActive ? 'linear-gradient(135deg,#b45309,#f59e0b)' : 'transparent',
                                     color: isActive ? 'white' : '#6b7280',
@@ -454,6 +456,7 @@ const DossierEdit = () => {
                         {activeTab === 'devis'               && <DevisManager dossierId={id} />}
                         {activeTab === 'factures_tiers'      && <FacturesTiersManager dossierId={id} />}
                         {activeTab === 'facturation'         && <FacturationManager dossierId={id} />}
+                        {activeTab === 'reglements'          && <DossierReglementsManager dossierId={id} />}
                     </div>
                 )}
             </div>
