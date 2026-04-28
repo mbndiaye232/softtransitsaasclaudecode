@@ -1,31 +1,51 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, RefreshCw, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { CreditCard, RefreshCw, CheckCircle, Clock, AlertCircle, Plus, X } from 'lucide-react';
 import { facturesAPI, reglementsAPI, dossiersAPI } from '../../services/api';
 
 export default function DossierReglementsManager({ dossierId }) {
-    const [factures, setFactures] = useState([]);
-    const [reglements, setReglements] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const [factures, setFactures]       = useState([]);
+    const [reglements, setReglements]   = useState([]);
+    const [modes, setModes]             = useState([]);
+    const [clientId, setClientId]       = useState(null);
+    const [loading, setLoading]         = useState(true);
+    const [error, setError]             = useState(null);
+    const [showForm, setShowForm]       = useState(false);
+
+    // Form state
+    const [selectedFactures, setSelectedFactures] = useState([]);
+    const [montant, setMontant]         = useState('');
+    const [date, setDate]               = useState(new Date().toISOString().split('T')[0]);
+    const [mode, setMode]               = useState('');
+    const [observations, setObservations] = useState('');
+    const [saving, setSaving]           = useState(false);
+    const [msg, setMsg]                 = useState(null);
 
     const load = async () => {
         setLoading(true);
         setError(null);
         try {
-            const dosRes = await dossiersAPI.getOne(dossierId);
+            const [dosRes, modesRes] = await Promise.all([
+                dossiersAPI.getOne(dossierId),
+                reglementsAPI.getModes(),
+            ]);
             const dossier = dosRes.data;
-            const clientId = dossier?.IDCLIENTS || dossier?.clientId;
+            const cid = dossier?.IDCLIENTS || dossier?.clientId;
+            setClientId(cid);
+            if (modes.length === 0 && modesRes.data?.length > 0) {
+                setModes(modesRes.data);
+                setMode(modesRes.data[0].IDModesReglements);
+            }
 
             const [factRes, reglRes] = await Promise.all([
                 facturesAPI.getByDossier(dossierId),
-                clientId ? reglementsAPI.getClientHistory(clientId) : Promise.resolve({ data: [] }),
+                cid ? reglementsAPI.getClientHistory(cid) : Promise.resolve({ data: [] }),
             ]);
 
             const factureIds = new Set((factRes.data || []).map(f => f.IDFactures));
             setFactures(factRes.data || []);
             setReglements((reglRes.data || []).filter(r => factureIds.has(r.IDFactures)));
         } catch (e) {
-            setError('Erreur lors du chargement des règlements.');
+            setError('Erreur lors du chargement.');
         } finally {
             setLoading(false);
         }
@@ -33,15 +53,57 @@ export default function DossierReglementsManager({ dossierId }) {
 
     useEffect(() => { load(); }, [dossierId]);
 
-    const totalFacture = factures.reduce((s, f) => s + Number(f.MontantTTCFacture || 0), 0);
-    const totalRegle   = factures.reduce((s, f) => s + Number(f.MontantRegleFacture || 0), 0);
-    const reliquat     = totalFacture - totalRegle;
+    const unpaidFactures = factures.filter(f => Number(f.ReliquatFacture || 0) > 0 && Number(f.Validee) === 1);
+    const totalSelected = unpaidFactures
+        .filter(f => selectedFactures.includes(f.IDFactures))
+        .reduce((s, f) => s + Number(f.ReliquatFacture || 0), 0);
+
+    const toggleFacture = (id) => setSelectedFactures(prev =>
+        prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+
+    const showMsg = (text, type = 'info') => {
+        setMsg({ text, type });
+        setTimeout(() => setMsg(null), 5000);
+    };
+
+    const handleSubmit = async () => {
+        if (selectedFactures.length === 0) return showMsg('Sélectionnez au moins une facture.', 'error');
+        const m = parseFloat(montant);
+        if (!m || m <= 0) return showMsg('Montant invalide.', 'error');
+        if (!mode) return showMsg('Choisissez un mode de règlement.', 'error');
+
+        setSaving(true);
+        try {
+            await reglementsAPI.processPayment({
+                clientId,
+                montantReglement: m,
+                dateReglement: date,
+                listFactures: selectedFactures,
+                idModeReglement: mode,
+                observations,
+            });
+            showMsg('Règlement enregistré avec succès.', 'success');
+            setShowForm(false);
+            setSelectedFactures([]);
+            setMontant('');
+            setObservations('');
+            await load();
+        } catch (e) {
+            showMsg(e.response?.data?.error || 'Erreur lors du règlement.', 'error');
+        } finally {
+            setSaving(false);
+        }
+    };
 
     const fmt = (n) => Number(n || 0).toLocaleString('fr-FR') + ' FCFA';
 
-    const statusColor = reliquat <= 0 ? '#16a34a' : reliquat < totalFacture ? '#d97706' : '#dc2626';
-    const statusLabel = reliquat <= 0 ? 'Soldé' : reliquat < totalFacture ? 'Partiel' : 'Impayé';
-    const StatusIcon  = reliquat <= 0 ? CheckCircle : reliquat < totalFacture ? Clock : AlertCircle;
+    const totalFacture = factures.reduce((s, f) => s + Number(f.MontantTTCFacture || 0), 0);
+    const totalRegle   = factures.reduce((s, f) => s + Number(f.MontantRegleFacture || 0), 0);
+    const reliquat     = totalFacture - totalRegle;
+    const statusColor  = reliquat <= 0 ? '#16a34a' : reliquat < totalFacture ? '#d97706' : '#dc2626';
+    const statusLabel  = reliquat <= 0 ? 'Soldé' : reliquat < totalFacture ? 'Partiel' : 'Impayé';
+    const StatusIcon   = reliquat <= 0 ? CheckCircle : reliquat < totalFacture ? Clock : AlertCircle;
 
     if (loading) return (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
@@ -51,13 +113,21 @@ export default function DossierReglementsManager({ dossierId }) {
     );
 
     if (error) return (
-        <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 12, padding: 20, color: '#be123c', fontWeight: 600 }}>
-            {error}
-        </div>
+        <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 12, padding: 20, color: '#be123c', fontWeight: 600 }}>{error}</div>
     );
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+            {/* Message feedback */}
+            {msg && (
+                <div style={{ padding: '12px 18px', borderRadius: 10, fontWeight: 600, fontSize: 13,
+                    background: msg.type === 'success' ? '#dcfce7' : '#fee2e2',
+                    color: msg.type === 'success' ? '#16a34a' : '#dc2626',
+                    border: `1px solid ${msg.type === 'success' ? '#bbf7d0' : '#fecaca'}` }}>
+                    {msg.text}
+                </div>
+            )}
 
             {/* Récapitulatif */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
@@ -72,6 +142,85 @@ export default function DossierReglementsManager({ dossierId }) {
                     </div>
                 ))}
             </div>
+
+            {/* Formulaire de saisie d'un règlement */}
+            {showForm ? (
+                <div style={{ background: 'white', borderRadius: 14, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+                    <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Plus size={15} color="#b45309" />
+                        <span style={{ fontWeight: 800, fontSize: 13, color: '#1e293b' }}>Saisir un règlement</span>
+                        <button onClick={() => setShowForm(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={16} /></button>
+                    </div>
+                    <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+                        {/* Sélection des factures */}
+                        <div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 8, textTransform: 'uppercase' }}>Factures à régler *</div>
+                            {unpaidFactures.length === 0 ? (
+                                <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, color: '#94a3b8', fontSize: 13 }}>Toutes les factures sont soldées.</div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                    {unpaidFactures.map(f => (
+                                        <label key={f.IDFactures} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, border: `2px solid ${selectedFactures.includes(f.IDFactures) ? '#b45309' : '#e5e7eb'}`, cursor: 'pointer', background: selectedFactures.includes(f.IDFactures) ? '#fff7ed' : 'white' }}>
+                                            <input type="checkbox" checked={selectedFactures.includes(f.IDFactures)} onChange={() => toggleFacture(f.IDFactures)} style={{ accentColor: '#b45309', width: 16, height: 16 }} />
+                                            <span style={{ fontWeight: 700, color: '#1e293b', flex: 1 }}>{f.NumeroFacture}</span>
+                                            <span style={{ fontSize: 12, color: '#64748b' }}>Reliquat :</span>
+                                            <span style={{ fontWeight: 800, color: '#dc2626' }}>{fmt(f.ReliquatFacture)}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+                            {totalSelected > 0 && (
+                                <div style={{ marginTop: 8, fontSize: 12, color: '#b45309', fontWeight: 700 }}>
+                                    Total sélectionné : {fmt(totalSelected)}
+                                    <button onClick={() => setMontant(totalSelected)} style={{ marginLeft: 10, fontSize: 11, fontWeight: 700, background: '#fff7ed', border: '1px solid #fed7aa', color: '#b45309', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>
+                                        Remplir auto
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Champs du formulaire */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                            <div>
+                                <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>Montant (FCFA) *</label>
+                                <input type="number" value={montant} onChange={e => setMontant(e.target.value)} placeholder="0"
+                                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, fontWeight: 700, outline: 'none' }} />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>Date *</label>
+                                <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, outline: 'none' }} />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>Mode de règlement *</label>
+                                <select value={mode} onChange={e => setMode(e.target.value)}
+                                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, outline: 'none', background: 'white' }}>
+                                    {modes.map(m => <option key={m.IDModesReglements} value={m.IDModesReglements}>{m.libelle}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>Observations</label>
+                                <input type="text" value={observations} onChange={e => setObservations(e.target.value)} placeholder="Facultatif…"
+                                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, outline: 'none' }} />
+                            </div>
+                        </div>
+
+                        <button onClick={handleSubmit} disabled={saving}
+                            style={{ alignSelf: 'flex-end', display: 'flex', alignItems: 'center', gap: 8, padding: '11px 24px', borderRadius: 10, border: 'none', cursor: saving ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 14, color: 'white', background: saving ? '#9ca3af' : 'linear-gradient(135deg,#b45309,#f59e0b)', boxShadow: '0 4px 12px rgba(245,158,11,.35)' }}>
+                            {saving ? <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={16} />}
+                            {saving ? 'Enregistrement…' : 'Valider le règlement'}
+                        </button>
+                    </div>
+                </div>
+            ) : (
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button onClick={() => setShowForm(true)} disabled={unpaidFactures.length === 0}
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, border: 'none', cursor: unpaidFactures.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 13, color: 'white', background: unpaidFactures.length === 0 ? '#9ca3af' : 'linear-gradient(135deg,#b45309,#f59e0b)', boxShadow: unpaidFactures.length === 0 ? 'none' : '0 4px 12px rgba(245,158,11,.35)' }}>
+                        <Plus size={15} /> Saisir un règlement
+                    </button>
+                </div>
+            )}
 
             {/* Factures du dossier */}
             <div style={{ background: 'white', borderRadius: 14, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
@@ -96,8 +245,8 @@ export default function DossierReglementsManager({ dossierId }) {
                         </thead>
                         <tbody>
                             {factures.map(f => {
-                                const rel = Number(f.ReliquatFacture || 0);
-                                const ttc = Number(f.MontantTTCFacture || 0);
+                                const rel   = Number(f.ReliquatFacture || 0);
+                                const ttc   = Number(f.MontantTTCFacture || 0);
                                 const regle = Number(f.MontantRegleFacture || 0);
                                 const sc = rel <= 0 ? '#16a34a' : regle > 0 ? '#d97706' : '#dc2626';
                                 const sl = rel <= 0 ? 'Soldé' : regle > 0 ? 'Partiel' : 'Impayé';
