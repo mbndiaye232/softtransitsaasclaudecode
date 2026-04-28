@@ -47,7 +47,7 @@ export default function DossierReglementsManager({ dossierId }) {
             setFactures(factRes.data || []);
             setReglements((reglRes.data || []).filter(r => factureIds.has(r.IDFactures)));
         } catch (e) {
-            setError('Erreur lors du chargement.');
+            setError('Erreur lors du chargement des règlements.');
         } finally {
             setLoading(false);
         }
