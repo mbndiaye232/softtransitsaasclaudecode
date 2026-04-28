@@ -51,6 +51,8 @@ import UnitesPoidsPage from './pages/UnitesPoidsPage'
 import UnitesVolumePage from './pages/UnitesVolumePage'
 import RegimesDeclarationPage from './pages/RegimesDeclarationPage'
 import CouleursPage from './pages/CouleursPage'
+import ReglementsPage from './pages/ReglementsPage'
+import CancellationManager from './pages/CancellationManager'
 
 const ProtectedRoute = ({ children }) => {
     const { user, loading } = useAuth()
@@ -110,6 +112,8 @@ function AppRoutes() {
             <Route path="/produits" element={<ProtectedWithBilling><ProductList /></ProtectedWithBilling>} />
             <Route path="/parameters-hub" element={<ProtectedWithBilling><SettingsHub /></ProtectedWithBilling>} />
             <Route path="/etats-financiers" element={<ProtectedWithBilling><EtatsFinanciers /></ProtectedWithBilling>} />
+            <Route path="/reglements" element={<ProtectedWithBilling><ReglementsPage /></ProtectedWithBilling>} />
+            <Route path="/reglements/cancellation" element={<ProtectedWithBilling><CancellationManager /></ProtectedWithBilling>} />
             <Route path="/suivi-dossiers" element={<ProtectedWithBilling><SuiviDossiers /></ProtectedWithBilling>} />
             <Route path="/documents" element={<ProtectedWithBilling><DocumentManager /></ProtectedWithBilling>} />
             <Route path="/decision-dashboard" element={<ProtectedWithBilling><DecisionDashboard /></ProtectedWithBilling>} />
