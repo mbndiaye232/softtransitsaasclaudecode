@@ -413,7 +413,8 @@ export default function NoteDeDetail() {
         if (art?.NTS) {
             try {
                 const r = await taxesAPI.getAll(art.NTS);
-                setCalculatedTaxes(r.data.map(t=>({...t, Taux:t.Taux||0, Montant:0, IsApplicable:true})));
+                // N'afficher que les taxes avec un taux > 0 pour ce NTS
+                setCalculatedTaxes(r.data.filter(t => parseFloat(t.Taux) > 0).map(t=>({...t, Taux:t.Taux||0, Montant:0, IsApplicable:true})));
                 setSelectedArticle(art.IDArticles||'temp');
                 if (art.IDArticles) await handleCalculateTaxes(art.IDArticles);
             } catch(e) { console.error(e); }
@@ -732,7 +733,7 @@ export default function NoteDeDetail() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {(selectedArticle?calculatedTaxes.filter(t=>t.IsApplicable):allTaxes.map(t=>({...t,Montant:0,IsApplicable:true}))).map((tax,i)=>{
+                                    {(selectedArticle?calculatedTaxes.filter(t=>t.IsApplicable&&(parseFloat(t.Taux)>0||excludedTaxes.includes(t.CodeTaxe))):allTaxes.map(t=>({...t,Montant:0,IsApplicable:true}))).map((tax,i)=>{
                                         const excl = excludedTaxes.includes(tax.CodeTaxe);
                                         return (
                                             <tr key={i} style={{borderBottom:'1px solid #f8fafc',opacity:excl?.45:1,background:tax.Montant>0?'#fff1f2':'white',transition:'background .1s'}}>
