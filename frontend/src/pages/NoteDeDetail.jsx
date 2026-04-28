@@ -288,8 +288,43 @@ export default function NoteDeDetail() {
         try {
             const r = await notesAPI.calculateTaxes(articleId, { excludedTaxCodes: excludedTaxes });
             setCalculatedTaxes(r.data.taxes); setSelectedArticle(articleId);
-            showMessage(`Calcul: ${r.data.total} FCFA`, 'success');
+            showMessage(`Calcul: ${r.data.total.toLocaleString()} FCFA`, 'success');
         } catch(e) { showMessage('Erreur calcul taxes','error'); }
+    };
+
+    const handleLancer = async () => {
+        const art = matrixArticles[activeColumnIndex];
+        if (!art?.NTS?.trim()) { showMessage('L\'article actif n\'a pas de code NTS', 'warning'); return; }
+        if (!selectedNote) { showMessage('Sélectionnez une note d\'abord', 'warning'); return; }
+        try {
+            let articleId = art.IDArticles;
+            if (articleId) {
+                // Mise à jour avant calcul
+                await notesAPI.updateArticle(articleId, art);
+            } else {
+                // Sauvegarde de tous les articles valides, puis récupération de l'IDArticles
+                const valid = matrixArticles.filter(a => a.NTS && a.NTS.trim() !== '');
+                for (const a of valid) {
+                    if (a.IDArticles) await notesAPI.updateArticle(a.IDArticles, a);
+                    else await notesAPI.addArticle(selectedNote.IDNotesDeDetails, { ...a, IdAgent: user?.id || 1 });
+                }
+                // Recharger pour obtenir les IDArticles
+                const db = (await notesAPI.getArticles(selectedNote.IDNotesDeDetails)).data;
+                const saved = db[activeColumnIndex];
+                articleId = saved?.IDArticles || saved?.idarticles || saved?.IDARTICLES;
+                if (!articleId) { showMessage('Impossible d\'obtenir l\'ID article après sauvegarde', 'error'); return; }
+                // Mettre à jour le state pour refléter les IDArticles
+                setMatrixArticles(Array(11).fill(null).map((_, i) => {
+                    if (i < db.length) {
+                        const d = db[i];
+                        return { ...d, NumeroArticle: i + 1, IDArticles: d.IDArticles || d.idarticles || d.IDARTICLES, Fret: d.FRET || d.Fret || 0, Assurances: d.ASSURANCES || d.Assurances || 0 };
+                    }
+                    return matrixArticles[i];
+                }));
+                showMessage('Matrice sauvegardée — calcul en cours…', 'info');
+            }
+            await handleCalculateTaxes(articleId);
+        } catch(e) { showMessage('Erreur lors du lancement du calcul','error'); }
     };
 
     const handleToggleTaxExclusion = (code) => {
@@ -662,7 +697,7 @@ export default function NoteDeDetail() {
                                 <span style={{fontSize:10,fontWeight:600,color:'rgba(255,255,255,.6)'}}>Art. {activeColumnIndex+1}</span>
                             </div>
                             <div style={{display:'flex',gap:6}}>
-                                <button onClick={()=>{const a=matrixArticles[activeColumnIndex]; if(a?.IDArticles) handleCalculateTaxes(a.IDArticles); else showMessage('Sauvegardez d\'abord la matrice','warning');}}
+                                <button onClick={handleLancer}
                                     style={{padding:'4px 9px',borderRadius:6,border:'none',background:'rgba(255,255,255,.2)',color:'white',fontWeight:700,fontSize:10,cursor:'pointer',display:'flex',alignItems:'center',gap:4}}>
                                     <Activity size={11}/> Lancer
                                 </button>
