@@ -289,42 +289,51 @@ export default function NoteDeDetail() {
             const r = await notesAPI.calculateTaxes(articleId, { excludedTaxCodes: excludedTaxes });
             setCalculatedTaxes(r.data.taxes); setSelectedArticle(articleId);
             showMessage(`Calcul: ${r.data.total.toLocaleString()} FCFA`, 'success');
-        } catch(e) { showMessage('Erreur calcul taxes','error'); }
+        } catch(e) {
+            console.error('calculateTaxes error:', e?.response?.data || e?.message || e);
+            throw e;
+        }
     };
 
     const handleLancer = async () => {
         const art = matrixArticles[activeColumnIndex];
         if (!art?.NTS?.trim()) { showMessage('L\'article actif n\'a pas de code NTS', 'warning'); return; }
         if (!selectedNote) { showMessage('Sélectionnez une note d\'abord', 'warning'); return; }
+        const fob = parseFloat(art.FOB || 0);
+        const fret = parseFloat(art.Fret ?? art.FRET ?? 0);
+        const ass = parseFloat(art.Assurances ?? art.ASSURANCES ?? 0);
+        if (fob === 0 && fret === 0 && ass === 0) {
+            showMessage('FOB, FRET et ASSURANCES sont tous à 0 — saisissez le FOB puis cliquez "Répartir" avant de lancer', 'warning');
+            return;
+        }
         try {
             let articleId = art.IDArticles;
             if (articleId) {
-                // Mise à jour avant calcul
-                await notesAPI.updateArticle(articleId, art);
+                await notesAPI.updateArticle(articleId, { ...art, Fret: art.Fret ?? art.FRET ?? 0, Assurances: art.Assurances ?? art.ASSURANCES ?? 0 });
             } else {
-                // Sauvegarde de tous les articles valides, puis récupération de l'IDArticles
                 const valid = matrixArticles.filter(a => a.NTS && a.NTS.trim() !== '');
                 for (const a of valid) {
-                    if (a.IDArticles) await notesAPI.updateArticle(a.IDArticles, a);
-                    else await notesAPI.addArticle(selectedNote.IDNotesDeDetails, { ...a, IdAgent: user?.id || 1 });
+                    const normalized = { ...a, Fret: a.Fret ?? a.FRET ?? 0, Assurances: a.Assurances ?? a.ASSURANCES ?? 0 };
+                    if (a.IDArticles) await notesAPI.updateArticle(a.IDArticles, normalized);
+                    else await notesAPI.addArticle(selectedNote.IDNotesDeDetails, { ...normalized, IdAgent: user?.id || 1 });
                 }
-                // Recharger pour obtenir les IDArticles
                 const db = (await notesAPI.getArticles(selectedNote.IDNotesDeDetails)).data;
-                const saved = db[activeColumnIndex];
+                const targetNum = activeColumnIndex + 1;
+                const saved = db.find(d => Number(d.NumeroArticle) === targetNum);
                 articleId = saved?.IDArticles || saved?.idarticles || saved?.IDARTICLES;
                 if (!articleId) { showMessage('Impossible d\'obtenir l\'ID article après sauvegarde', 'error'); return; }
-                // Mettre à jour le state pour refléter les IDArticles
-                setMatrixArticles(Array(11).fill(null).map((_, i) => {
-                    if (i < db.length) {
-                        const d = db[i];
-                        return { ...d, NumeroArticle: i + 1, IDArticles: d.IDArticles || d.idarticles || d.IDARTICLES, Fret: d.FRET || d.Fret || 0, Assurances: d.ASSURANCES || d.Assurances || 0 };
-                    }
-                    return matrixArticles[i];
+                setMatrixArticles(prev => prev.map((col, i) => {
+                    const match = db.find(d => Number(d.NumeroArticle) === i + 1);
+                    if (match) return { ...match, NumeroArticle: i + 1, IDArticles: match.IDArticles || match.idarticles || match.IDARTICLES, Fret: match.FRET || match.Fret || 0, Assurances: match.ASSURANCES || match.Assurances || 0 };
+                    return col;
                 }));
                 showMessage('Matrice sauvegardée — calcul en cours…', 'info');
             }
             await handleCalculateTaxes(articleId);
-        } catch(e) { showMessage('Erreur lors du lancement du calcul','error'); }
+        } catch(e) {
+            console.error('handleLancer error:', e?.response?.data || e?.message || e);
+            showMessage(`Erreur: ${e?.response?.data?.message || e?.message || 'Lancement du calcul'}`, 'error');
+        }
     };
 
     const handleToggleTaxExclusion = (code) => {
@@ -399,7 +408,8 @@ export default function NoteDeDetail() {
         if (art?.NTS) {
             try {
                 const r = await taxesAPI.getAll(art.NTS);
-                setCalculatedTaxes(r.data.map(t=>({...t, Taux:t.Taux||0, Montant:0, IsApplicable:true})));
+                // N'afficher que les taxes avec un taux > 0 pour ce NTS
+                setCalculatedTaxes(r.data.filter(t => parseFloat(t.Taux) > 0).map(t=>({...t, Taux:t.Taux||0, Montant:0, IsApplicable:true})));
                 setSelectedArticle(art.IDArticles||'temp');
                 if (art.IDArticles) await handleCalculateTaxes(art.IDArticles);
             } catch(e) { console.error(e); }
@@ -718,7 +728,7 @@ export default function NoteDeDetail() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {(selectedArticle?calculatedTaxes:allTaxes.map(t=>({...t,Montant:0,IsApplicable:true}))).map((tax,i)=>{
+                                    {(selectedArticle?calculatedTaxes.filter(t=>t.IsApplicable&&(parseFloat(t.Taux)>0||excludedTaxes.includes(t.CodeTaxe))):allTaxes.map(t=>({...t,Montant:0,IsApplicable:true}))).map((tax,i)=>{
                                         const excl = excludedTaxes.includes(tax.CodeTaxe);
                                         return (
                                             <tr key={i} style={{borderBottom:'1px solid #f8fafc',opacity:excl?.45:1,background:tax.Montant>0?'#fff1f2':'white',transition:'background .1s'}}>
