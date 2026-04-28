@@ -732,7 +732,7 @@ export default function NoteDeDetail() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {(selectedArticle?calculatedTaxes:allTaxes.map(t=>({...t,Montant:0,IsApplicable:true}))).map((tax,i)=>{
+                                    {(selectedArticle?calculatedTaxes.filter(t=>t.IsApplicable):allTaxes.map(t=>({...t,Montant:0,IsApplicable:true}))).map((tax,i)=>{
                                         const excl = excludedTaxes.includes(tax.CodeTaxe);
                                         return (
                                             <tr key={i} style={{borderBottom:'1px solid #f8fafc',opacity:excl?.45:1,background:tax.Montant>0?'#fff1f2':'white',transition:'background .1s'}}>
