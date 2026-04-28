@@ -75,6 +75,7 @@ const DossierEdit = () => {
         { id: 'titre_transport',    label: 'TT (Titre)',     icon: <FileText size={13} /> },
         { id: 'transport',          label: 'Transports',     icon: <LinkIcon size={13} /> },
         { id: 'composition',        label: 'Composition',    icon: <Package size={13} /> },
+        { id: 'notes_detail',       label: 'Notes de détail',icon: <FileSearch size={13} />, navigate: true },
         { id: 'declaration',        label: 'Déclaration',    icon: <Shield size={13} /> },
         { id: 'mise_livraison',     label: 'Mise en Liv.',   icon: <Truck size={13} /> },
         { id: 'ordre-transport',    label: 'OTR (Transp.)',  icon: <Truck size={13} /> },
@@ -226,7 +227,10 @@ const DossierEdit = () => {
                             <button
                                 key={tab.id}
                                 type="button"
-                                onClick={() => setActiveTab(tab.id)}
+                                onClick={() => tab.navigate
+                                    ? navigate('/notes', { state: { preselectedDossierId: id, preselectedClientId: form.clientId } })
+                                    : setActiveTab(tab.id)
+                                }
                                 style={{
                                     display:'flex', alignItems:'center', gap:6,
                                     padding:'9px 14px', borderRadius:10, border:'none', cursor:'pointer',
