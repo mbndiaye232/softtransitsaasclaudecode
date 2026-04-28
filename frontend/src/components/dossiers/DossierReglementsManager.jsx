@@ -12,8 +12,6 @@ export default function DossierReglementsManager({ dossierId }) {
     const [loading, setLoading]         = useState(true);
     const [error, setError]             = useState(null);
     const [showForm, setShowForm]       = useState(false);
-
-    // Form state
     const [selectedFactures, setSelectedFactures] = useState([]);
     const [montant, setMontant]         = useState('');
     const [date, setDate]               = useState(new Date().toISOString().split('T')[0]);
@@ -21,6 +19,7 @@ export default function DossierReglementsManager({ dossierId }) {
     const [observations, setObservations] = useState('');
     const [saving, setSaving]           = useState(false);
     const [msg, setMsg]                 = useState(null);
+    const [validating, setValidating]   = useState({});
 
     const load = async () => {
         setLoading(true);
@@ -37,12 +36,10 @@ export default function DossierReglementsManager({ dossierId }) {
                 setModes(modesRes.data);
                 setMode(modesRes.data[0].IDModesReglements);
             }
-
             const [factRes, reglRes] = await Promise.all([
                 facturesAPI.getByDossier(dossierId),
                 cid ? reglementsAPI.getClientHistory(cid) : Promise.resolve({ data: [] }),
             ]);
-
             const factureIds = new Set((factRes.data || []).map(f => f.IDFactures));
             setFactures(factRes.data || []);
             setReglements((reglRes.data || []).filter(r => factureIds.has(r.IDFactures)));
@@ -56,7 +53,7 @@ export default function DossierReglementsManager({ dossierId }) {
     useEffect(() => { load(); }, [dossierId]);
 
     const unpaidFactures = factures.filter(f => Number(f.ReliquatFacture || 0) > 0 && Number(f.Validee) === 1);
-    const totalSelected = unpaidFactures
+    const totalSelected  = unpaidFactures
         .filter(f => selectedFactures.includes(f.IDFactures))
         .reduce((s, f) => s + Number(f.ReliquatFacture || 0), 0);
 
@@ -69,12 +66,28 @@ export default function DossierReglementsManager({ dossierId }) {
         setTimeout(() => setMsg(null), 5000);
     };
 
+    const handleToggleValidation = async (f) => {
+        const id = f.IDFactures;
+        setValidating(v => ({ ...v, [id]: true }));
+        try {
+            if (Number(f.Validee) === 1) {
+                await facturesAPI.unvalidate(id);
+            } else {
+                await facturesAPI.validate(id);
+            }
+            await load();
+        } catch (e) {
+            showMsg(e.response?.data?.error || 'Erreur lors de la validation.', 'error');
+        } finally {
+            setValidating(v => ({ ...v, [id]: false }));
+        }
+    };
+
     const handleSubmit = async () => {
         if (selectedFactures.length === 0) return showMsg('Sélectionnez au moins une facture.', 'error');
         const m = parseFloat(montant);
         if (!m || m <= 0) return showMsg('Montant invalide.', 'error');
         if (!mode) return showMsg('Choisissez un mode de règlement.', 'error');
-
         setSaving(true);
         try {
             await reglementsAPI.processPayment({
@@ -120,8 +133,8 @@ export default function DossierReglementsManager({ dossierId }) {
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
-            {/* Message feedback */}
             {msg && (
                 <div style={{ padding: '12px 18px', borderRadius: 10, fontWeight: 600, fontSize: 13,
                     background: msg.type === 'success' ? '#dcfce7' : '#fee2e2',
@@ -145,7 +158,7 @@ export default function DossierReglementsManager({ dossierId }) {
                 ))}
             </div>
 
-            {/* Formulaire de saisie d'un règlement */}
+            {/* Formulaire de saisie */}
             {showForm ? (
                 <div style={{ background: 'white', borderRadius: 14, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
                     <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -154,8 +167,6 @@ export default function DossierReglementsManager({ dossierId }) {
                         <button onClick={() => setShowForm(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={16} /></button>
                     </div>
                     <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-                        {/* Sélection des factures */}
                         <div>
                             <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 8, textTransform: 'uppercase' }}>Factures à régler *</div>
                             {unpaidFactures.length === 0 ? (
@@ -181,8 +192,6 @@ export default function DossierReglementsManager({ dossierId }) {
                                 </div>
                             )}
                         </div>
-
-                        {/* Champs du formulaire */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                             <div>
                                 <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>Montant (FCFA) *</label>
@@ -207,7 +216,6 @@ export default function DossierReglementsManager({ dossierId }) {
                                     style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, outline: 'none' }} />
                             </div>
                         </div>
-
                         <button onClick={handleSubmit} disabled={saving}
                             style={{ alignSelf: 'flex-end', display: 'flex', alignItems: 'center', gap: 8, padding: '11px 24px', borderRadius: 10, border: 'none', cursor: saving ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 14, color: 'white', background: saving ? '#9ca3af' : 'linear-gradient(135deg,#b45309,#f59e0b)', boxShadow: '0 4px 12px rgba(245,158,11,.35)' }}>
                             {saving ? <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={16} />}
@@ -217,7 +225,7 @@ export default function DossierReglementsManager({ dossierId }) {
                 </div>
             ) : (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-                    <button onClick={() => navigate('/reglements')}
+                    <button onClick={() => navigate('/reglements', { state: { preselectedClientId: clientId } })}
                         style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, border: '1px solid #e5e7eb', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: '#374151', background: 'white', boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
                         <ExternalLink size={14} /> Saisie complète des règlements
                     </button>
@@ -244,7 +252,7 @@ export default function DossierReglementsManager({ dossierId }) {
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                         <thead>
                             <tr style={{ background: '#f8fafc' }}>
-                                {['N° Facture', 'Type', 'Montant TTC', 'Réglé', 'Reliquat', 'Statut'].map(h => (
+                                {['N° Facture', 'Type', 'Montant TTC', 'Réglé', 'Reliquat', 'Valider', 'Statut'].map(h => (
                                     <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 700, fontSize: 11, color: '#64748b', textTransform: 'uppercase', borderBottom: '1px solid #e5e7eb' }}>{h}</th>
                                 ))}
                             </tr>
@@ -256,6 +264,7 @@ export default function DossierReglementsManager({ dossierId }) {
                                 const regle = Number(f.MontantRegleFacture || 0);
                                 const sc = rel <= 0 ? '#16a34a' : regle > 0 ? '#d97706' : '#dc2626';
                                 const sl = rel <= 0 ? 'Soldé' : regle > 0 ? 'Partiel' : 'Impayé';
+                                const isValidated = Number(f.Validee) === 1;
                                 return (
                                     <tr key={f.IDFactures} style={{ borderBottom: '1px solid #f1f5f9' }}>
                                         <td style={{ padding: '12px 16px', fontWeight: 700, color: '#1e293b' }}>{f.NumeroFacture}</td>
@@ -263,6 +272,17 @@ export default function DossierReglementsManager({ dossierId }) {
                                         <td style={{ padding: '12px 16px', fontWeight: 700 }}>{fmt(ttc)}</td>
                                         <td style={{ padding: '12px 16px', color: '#16a34a', fontWeight: 600 }}>{fmt(regle)}</td>
                                         <td style={{ padding: '12px 16px', color: sc, fontWeight: 700 }}>{fmt(rel)}</td>
+                                        <td style={{ padding: '12px 16px' }}>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: validating[f.IDFactures] ? 'wait' : 'pointer' }} title={isValidated ? 'Dévalider la facture' : 'Valider pour pouvoir régler'}>
+                                                {validating[f.IDFactures]
+                                                    ? <RefreshCw size={15} style={{ animation: 'spin 1s linear infinite', color: '#b45309' }} />
+                                                    : <input type="checkbox" checked={isValidated} onChange={() => handleToggleValidation(f)} style={{ accentColor: '#16a34a', width: 16, height: 16, cursor: 'pointer' }} />
+                                                }
+                                                <span style={{ fontSize: 11, color: isValidated ? '#16a34a' : '#94a3b8', fontWeight: 600 }}>
+                                                    {isValidated ? 'Validée' : 'Non validée'}
+                                                </span>
+                                            </label>
+                                        </td>
                                         <td style={{ padding: '12px 16px' }}>
                                             <span style={{ fontSize: 11, fontWeight: 700, color: sc, background: rel <= 0 ? '#dcfce7' : regle > 0 ? '#fef3c7' : '#fee2e2', padding: '2px 10px', borderRadius: 99 }}>{sl}</span>
                                         </td>
