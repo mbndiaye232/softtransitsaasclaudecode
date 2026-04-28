@@ -21,6 +21,7 @@ export default function DossierReglementsManager({ dossierId }) {
     const [observations, setObservations] = useState('');
     const [saving, setSaving]           = useState(false);
     const [msg, setMsg]                 = useState(null);
+    const [validating, setValidating]   = useState({}); // { [IDFactures]: true }
 
     const load = async () => {
         setLoading(true);
@@ -55,7 +56,7 @@ export default function DossierReglementsManager({ dossierId }) {
 
     useEffect(() => { load(); }, [dossierId]);
 
-    const unpaidFactures = factures.filter(f => Number(f.ReliquatFacture || 0) > 0);
+    const unpaidFactures = factures.filter(f => Number(f.ReliquatFacture || 0) > 0 && Number(f.Validee) === 1);
     const totalSelected = unpaidFactures
         .filter(f => selectedFactures.includes(f.IDFactures))
         .reduce((s, f) => s + Number(f.ReliquatFacture || 0), 0);
@@ -95,6 +96,23 @@ export default function DossierReglementsManager({ dossierId }) {
             showMsg(e.response?.data?.error || 'Erreur lors du règlement.', 'error');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleToggleValidation = async (f) => {
+        const id = f.IDFactures;
+        setValidating(v => ({ ...v, [id]: true }));
+        try {
+            if (Number(f.Validee) === 1) {
+                await facturesAPI.unvalidate(id);
+            } else {
+                await facturesAPI.validate(id);
+            }
+            await load();
+        } catch (e) {
+            showMsg(e.response?.data?.error || 'Erreur lors de la validation.', 'error');
+        } finally {
+            setValidating(v => ({ ...v, [id]: false }));
         }
     };
 
@@ -244,7 +262,7 @@ export default function DossierReglementsManager({ dossierId }) {
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                         <thead>
                             <tr style={{ background: '#f8fafc' }}>
-                                {['N° Facture', 'Type', 'Montant TTC', 'Réglé', 'Reliquat', 'Statut'].map(h => (
+                                {['N° Facture', 'Type', 'Montant TTC', 'Réglé', 'Reliquat', 'Valider', 'Statut'].map(h => (
                                     <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 700, fontSize: 11, color: '#64748b', textTransform: 'uppercase', borderBottom: '1px solid #e5e7eb' }}>{h}</th>
                                 ))}
                             </tr>
@@ -263,6 +281,17 @@ export default function DossierReglementsManager({ dossierId }) {
                                         <td style={{ padding: '12px 16px', fontWeight: 700 }}>{fmt(ttc)}</td>
                                         <td style={{ padding: '12px 16px', color: '#16a34a', fontWeight: 600 }}>{fmt(regle)}</td>
                                         <td style={{ padding: '12px 16px', color: sc, fontWeight: 700 }}>{fmt(rel)}</td>
+                                        <td style={{ padding: '12px 16px' }}>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: validating[f.IDFactures] ? 'wait' : 'pointer' }} title={Number(f.Validee) === 1 ? 'Dévalider la facture' : 'Valider la facture pour pouvoir la régler'}>
+                                                {validating[f.IDFactures]
+                                                    ? <RefreshCw size={15} style={{ animation: 'spin 1s linear infinite', color: '#b45309' }} />
+                                                    : <input type="checkbox" checked={Number(f.Validee) === 1} onChange={() => handleToggleValidation(f)} style={{ accentColor: '#16a34a', width: 16, height: 16, cursor: 'pointer' }} />
+                                                }
+                                                <span style={{ fontSize: 11, color: Number(f.Validee) === 1 ? '#16a34a' : '#94a3b8', fontWeight: 600 }}>
+                                                    {Number(f.Validee) === 1 ? 'Validée' : 'Non validée'}
+                                                </span>
+                                            </label>
+                                        </td>
                                         <td style={{ padding: '12px 16px' }}>
                                             <span style={{ fontSize: 11, fontWeight: 700, color: sc, background: rel <= 0 ? '#dcfce7' : regle > 0 ? '#fef3c7' : '#fee2e2', padding: '2px 10px', borderRadius: 99 }}>{sl}</span>
                                         </td>
