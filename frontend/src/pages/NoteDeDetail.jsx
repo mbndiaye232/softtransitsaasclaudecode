@@ -299,6 +299,13 @@ export default function NoteDeDetail() {
         const art = matrixArticles[activeColumnIndex];
         if (!art?.NTS?.trim()) { showMessage('L\'article actif n\'a pas de code NTS', 'warning'); return; }
         if (!selectedNote) { showMessage('Sélectionnez une note d\'abord', 'warning'); return; }
+        const fob = parseFloat(art.FOB || 0);
+        const fret = parseFloat(art.Fret ?? art.FRET ?? 0);
+        const ass = parseFloat(art.Assurances ?? art.ASSURANCES ?? 0);
+        if (fob === 0 && fret === 0 && ass === 0) {
+            showMessage('FOB, FRET et ASSURANCES sont tous à 0 — saisissez le FOB puis cliquez "Répartir" avant de lancer', 'warning');
+            return;
+        }
         try {
             let articleId = art.IDArticles;
             if (articleId) {
