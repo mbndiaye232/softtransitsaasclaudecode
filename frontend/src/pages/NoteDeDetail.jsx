@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { clientsAPI, dossiersAPI, notesAPI, produitsAPI, regimesAPI, devisesAPI, paysAPI, taxesAPI } from '../services/api';
 import {
     Calculator, FileText, Search, Users, Folder, Plus, Save,
@@ -79,6 +79,7 @@ const MiniTable = ({ cols, rows, selectedId, onSelect, getKey, getCells, emptyMs
 export default function NoteDeDetail() {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
 
     const [clients, setClients] = useState([]);
     const [selectedClient, setSelectedClient] = useState(null);
@@ -121,7 +122,24 @@ export default function NoteDeDetail() {
         init();
     }, []);
 
-    const loadClients  = async () => { try { setClients((await clientsAPI.getAll()).data); } catch(e) { showMessage('Erreur clients','error'); } };
+    const loadClients  = async () => {
+        try {
+            const data = (await clientsAPI.getAll()).data;
+            setClients(data);
+            // Auto-sélection depuis un dossier
+            const { preselectedClientId, preselectedDossierId } = location.state || {};
+            if (preselectedClientId) {
+                const client = data.find(c => String(c.IDCLIENTS) === String(preselectedClientId));
+                if (client) {
+                    setSelectedClient(client);
+                    if (preselectedDossierId) {
+                        // On stocke l'id à sélectionner après chargement des dossiers
+                        sessionStorage.setItem('nd_preselect_dossier', preselectedDossierId);
+                    }
+                }
+            }
+        } catch(e) { showMessage('Erreur clients','error'); }
+    };
     const loadRegimes  = async () => { try { setRegimes((await regimesAPI.getAll()).data); } catch(e) {} };
     const loadDevises  = async () => { try { setDevises((await devisesAPI.getAll()).data); } catch(e) {} };
     const loadPays     = async () => { try { setPays((await paysAPI.getAll()).data); } catch(e) {} };
@@ -135,7 +153,15 @@ export default function NoteDeDetail() {
     const loadDossiers = async (clientId) => {
         try {
             const r = await dossiersAPI.getAll();
-            setDossiers(r.data.filter(d => (d.clientId == clientId || d.IDClient == clientId) && (d.status !== 'CLOSED' && !d.Cloture)));
+            const filtered = r.data.filter(d => (d.clientId == clientId || d.IDClient == clientId) && (d.status !== 'CLOSED' && !d.Cloture));
+            setDossiers(filtered);
+            // Auto-sélection du dossier si demandé
+            const preId = sessionStorage.getItem('nd_preselect_dossier');
+            if (preId) {
+                sessionStorage.removeItem('nd_preselect_dossier');
+                const dossier = filtered.find(d => String(d.id || d.IDDossiers) === String(preId));
+                if (dossier) setSelectedDossier(dossier);
+            }
         } catch(e) { showMessage('Erreur dossiers','error'); }
     };
 
