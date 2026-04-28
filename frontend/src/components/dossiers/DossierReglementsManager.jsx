@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, RefreshCw, CheckCircle, Clock, AlertCircle, Plus, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { CreditCard, RefreshCw, CheckCircle, Clock, AlertCircle, Plus, X, ExternalLink } from 'lucide-react';
 import { facturesAPI, reglementsAPI, dossiersAPI } from '../../services/api';
 
 export default function DossierReglementsManager({ dossierId }) {
+    const navigate = useNavigate();
     const [factures, setFactures]       = useState([]);
     const [reglements, setReglements]   = useState([]);
     const [modes, setModes]             = useState([]);
@@ -214,7 +216,11 @@ export default function DossierReglementsManager({ dossierId }) {
                     </div>
                 </div>
             ) : (
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                    <button onClick={() => navigate('/reglements')}
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, border: '1px solid #e5e7eb', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: '#374151', background: 'white', boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
+                        <ExternalLink size={14} /> Saisie complète des règlements
+                    </button>
                     <button onClick={() => setShowForm(true)} disabled={unpaidFactures.length === 0}
                         style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, border: 'none', cursor: unpaidFactures.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 13, color: 'white', background: unpaidFactures.length === 0 ? '#9ca3af' : 'linear-gradient(135deg,#b45309,#f59e0b)', boxShadow: unpaidFactures.length === 0 ? 'none' : '0 4px 12px rgba(245,158,11,.35)' }}>
                         <Plus size={15} /> Saisir un règlement
