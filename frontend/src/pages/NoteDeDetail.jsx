@@ -537,6 +537,15 @@ export default function NoteDeDetail() {
                 </div>
             </div>
 
+            {/* Datalist partagé pour Origine et Provenance */}
+            <datalist id="pays-datalist">
+                {pays.map(p => (
+                    <option key={p.IDPays} value={p.codePays3 || p.CodePays2 || ''}>
+                        {p.codePays3 ? `${p.codePays3} – ${p.NomPays}` : p.NomPays}
+                    </option>
+                ))}
+            </datalist>
+
             {/* ── Matrice de Liquidation + Taxes côte à côte ─────────────── */}
             <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:12,alignItems:'start'}}>
 
@@ -598,7 +607,7 @@ export default function NoteDeDetail() {
                                         {/* Cells */}
                                         {[
                                             {field:'NTS',ph:'0000.00.00'},{field:'CodeRegimeDeclaration',ph:'C 000'},{field:'DPI',ph:''},{field:'TitreExo',ph:''},
-                                            {field:'Origine',ph:'',max:3},{field:'Provenance',ph:'',max:3},
+                                            {field:'Origine',type:'pays'},{field:'Provenance',type:'pays'},
                                             {field:'FOB',type:'number'},{field:'IDDEVISEFOB',type:'select'},
                                             {field:'Fret',type:'number'},{field:'IDDEVISEFRET',type:'select'},
                                             {field:'Assurances',type:'number'},{field:'IDDEVISEASS',type:'select'},
@@ -606,7 +615,17 @@ export default function NoteDeDetail() {
                                             {field:'QC',type:'number'},{field:'QM',type:'number'},{field:'CommissionFournisseur',type:'number'},
                                         ].map(({field,type,ph,max},ci)=>(
                                             <div key={ci} style={{height:34,borderBottom:'1px solid #f1f5f9',display:'flex',alignItems:'center'}}>
-                                                {type==='select' ? (
+                                                {type==='pays' ? (
+                                                    <>
+                                                        <input
+                                                            list="pays-datalist"
+                                                            value={art[field]||''}
+                                                            onChange={e=>updateMatrixArticle(idx,field,e.target.value.toUpperCase())}
+                                                            placeholder="Code / Pays…"
+                                                            style={{width:'100%',height:'100%',border:'none',background:'transparent',padding:'0 5px',fontSize:12,color:isActive?COLORS.matrice.accent:'#374151',fontWeight:isActive?700:400,outline:'none'}}
+                                                        />
+                                                    </>
+                                                ) : type==='select' ? (
                                                     <select value={art[field]} onChange={e=>updateMatrixArticle(idx,field,e.target.value)}
                                                         style={{width:'100%',height:'100%',border:'none',background:'transparent',padding:'0 3px',fontSize:11,color:isActive?'#1e293b':'#374151',outline:'none'}}>
                                                         {devises.map(d=>(<option key={d.IDDevises} value={d.IDDevises}>{d.Symbole}</option>))}
