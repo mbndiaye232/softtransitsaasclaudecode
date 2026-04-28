@@ -289,7 +289,10 @@ export default function NoteDeDetail() {
             const r = await notesAPI.calculateTaxes(articleId, { excludedTaxCodes: excludedTaxes });
             setCalculatedTaxes(r.data.taxes); setSelectedArticle(articleId);
             showMessage(`Calcul: ${r.data.total.toLocaleString()} FCFA`, 'success');
-        } catch(e) { showMessage('Erreur calcul taxes','error'); }
+        } catch(e) {
+            console.error('calculateTaxes error:', e?.response?.data || e?.message || e);
+            throw e;
+        }
     };
 
     const handleLancer = async () => {
@@ -324,7 +327,10 @@ export default function NoteDeDetail() {
                 showMessage('Matrice sauvegardée — calcul en cours…', 'info');
             }
             await handleCalculateTaxes(articleId);
-        } catch(e) { showMessage('Erreur lors du lancement du calcul','error'); }
+        } catch(e) {
+            console.error('handleLancer error:', e?.response?.data || e?.message || e);
+            showMessage(`Erreur: ${e?.response?.data?.message || e?.message || 'Lancement du calcul'}`, 'error');
+        }
     };
 
     const handleToggleTaxExclusion = (code) => {
