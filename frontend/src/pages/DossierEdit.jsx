@@ -213,9 +213,9 @@ const DossierEdit = () => {
 
                 {/* ── Tab bar ── */}
                 <div style={{
-                    display:'flex', gap:4, background:'white', padding:6, borderRadius:16,
+                    display:'flex', flexWrap:'wrap', gap:3, background:'white', padding:5, borderRadius:16,
                     border:'1px solid #e5e7eb', boxShadow:'0 8px 24px rgba(0,0,0,.10)',
-                    overflowX:'auto', scrollbarWidth:'none', marginBottom:24,
+                    marginBottom:24,
                 }}>
                     <style>{`::-webkit-scrollbar{display:none}`}</style>
                     {tabs.map(tab => {
@@ -226,9 +226,9 @@ const DossierEdit = () => {
                                 type="button"
                                 onClick={() => setActiveTab(tab.id)}
                                 style={{
-                                    display:'flex', alignItems:'center', gap:6,
-                                    padding:'8px 14px', borderRadius:10, border:'none', cursor:'pointer',
-                                    fontSize:12, fontWeight:700, whiteSpace:'nowrap',
+                                    display:'flex', alignItems:'center', gap:5,
+                                    padding:'7px 10px', borderRadius:10, border:'none', cursor:'pointer',
+                                    fontSize:11, fontWeight:700, whiteSpace:'nowrap',
                                     transition:'all .15s',
                                     background: isActive ? 'linear-gradient(135deg,#b45309,#f59e0b)' : 'transparent',
                                     color: isActive ? 'white' : '#6b7280',
