@@ -302,27 +302,28 @@ export default function NoteDeDetail() {
         try {
             let articleId = art.IDArticles;
             if (articleId) {
-                // Mise à jour avant calcul
-                await notesAPI.updateArticle(articleId, art);
+                // Mise à jour avant calcul (normaliser Fret/Assurances pour le backend)
+                await notesAPI.updateArticle(articleId, { ...art, Fret: art.Fret ?? art.FRET ?? 0, Assurances: art.Assurances ?? art.ASSURANCES ?? 0 });
             } else {
                 // Sauvegarde de tous les articles valides, puis récupération de l'IDArticles
                 const valid = matrixArticles.filter(a => a.NTS && a.NTS.trim() !== '');
                 for (const a of valid) {
-                    if (a.IDArticles) await notesAPI.updateArticle(a.IDArticles, a);
-                    else await notesAPI.addArticle(selectedNote.IDNotesDeDetails, { ...a, IdAgent: user?.id || 1 });
+                    const normalized = { ...a, Fret: a.Fret ?? a.FRET ?? 0, Assurances: a.Assurances ?? a.ASSURANCES ?? 0 };
+                    if (a.IDArticles) await notesAPI.updateArticle(a.IDArticles, normalized);
+                    else await notesAPI.addArticle(selectedNote.IDNotesDeDetails, { ...normalized, IdAgent: user?.id || 1 });
                 }
                 // Recharger pour obtenir les IDArticles
                 const db = (await notesAPI.getArticles(selectedNote.IDNotesDeDetails)).data;
-                const saved = db[activeColumnIndex];
+                // Chercher par NumeroArticle (pas par index) — les articles peuvent être non-contigus
+                const targetNum = activeColumnIndex + 1;
+                const saved = db.find(d => Number(d.NumeroArticle) === targetNum);
                 articleId = saved?.IDArticles || saved?.idarticles || saved?.IDARTICLES;
                 if (!articleId) { showMessage('Impossible d\'obtenir l\'ID article après sauvegarde', 'error'); return; }
-                // Mettre à jour le state pour refléter les IDArticles
-                setMatrixArticles(Array(11).fill(null).map((_, i) => {
-                    if (i < db.length) {
-                        const d = db[i];
-                        return { ...d, NumeroArticle: i + 1, IDArticles: d.IDArticles || d.idarticles || d.IDARTICLES, Fret: d.FRET || d.Fret || 0, Assurances: d.ASSURANCES || d.Assurances || 0 };
-                    }
-                    return matrixArticles[i];
+                // Mettre à jour le state par NumeroArticle
+                setMatrixArticles(prev => prev.map((col, i) => {
+                    const match = db.find(d => Number(d.NumeroArticle) === i + 1);
+                    if (match) return { ...match, NumeroArticle: i + 1, IDArticles: match.IDArticles || match.idarticles || match.IDARTICLES, Fret: match.FRET || match.Fret || 0, Assurances: match.ASSURANCES || match.Assurances || 0 };
+                    return col;
                 }));
                 showMessage('Matrice sauvegardée — calcul en cours…', 'info');
             }
