@@ -452,18 +452,18 @@ router.delete('/justificatifs/:id', checkPermission('FACTURES', 'can_edit'), asy
 
 /**
  * POST /api/factures/:id/send-email
- * Send invoice PDF + dossier documents to the client
- * Body: { compteMailId, emailDestinataire, documentIds: [id, ...], message }
+ * Send invoice PDF + dossier documents to the client via Brevo API (preferred) or SMTP fallback
+ * Body: { compteMailId, emailDestinataire, documentIds: [id, ...], message, objet }
  */
 router.post('/:id/send-email', checkPermission('FACTURES', 'can_view'), async (req, res) => {
     try {
         const invoiceId = req.params.id;
         const { compteMailId, emailDestinataire, documentIds = [], message: customMessage, objet: customObjet } = req.body;
-        const nodemailer = require('nodemailer');
+        const axios = require('axios');
         const { downloadFromR2 } = require('../utils/r2');
         const { decrypt } = require('../utils/encryption');
 
-        // 1. Fetch invoice + client data
+        // 1. Fetch invoice + structure data
         const InvoicePDFGenerator = require('../services/InvoicePDFGenerator');
         const generator = new InvoicePDFGenerator(pool);
         const data = await generator.fetchInvoiceData(invoiceId);
@@ -472,10 +472,12 @@ router.post('/:id/send-email', checkPermission('FACTURES', 'can_view'), async (r
         const clientEmail = emailDestinataire || data.invoice.EmailClient;
         if (!clientEmail) return res.status(400).json({ error: "Le client n'a pas d'adresse e-mail renseignée" });
 
-        // 2. Load mail account credentials
-        let transporter;
-        let fromAddress;
-        const SMTP_TIMEOUT = 20000; // 20s
+        const societeName = data.structure?.NomSociete || 'Soft Transit';
+        const subject = customObjet || `Facture ${data.invoice.NumeroFacture} — ${societeName}`;
+
+        // 2. Determine from address
+        let fromEmail = process.env.BREVO_SENDER_EMAIL || process.env.SMTP_USER || 'noreply@softtransit.net';
+        let fromName  = societeName;
 
         if (compteMailId) {
             const [[compte]] = await pool.query(
@@ -483,62 +485,35 @@ router.post('/:id/send-email', checkPermission('FACTURES', 'can_view'), async (r
                 [compteMailId, req.structur_id]
             );
             if (!compte) return res.status(404).json({ error: 'Compte mail introuvable' });
-            // DB columns: adressemail (lowercase), MotdePasse (lowercase d), ServeurSMTP, PortSMTP, SecureSSL
-            const adresseMail = compte.adressemail || compte.AdresseMail || compte.ADRESSEMAIL;
-            const motDePasse  = compte.MotdePasse  || compte.MotDePasse  || compte.MOTDEPASSE;
-            const serveurSMTP = compte.ServeurSMTP || compte.serveursmtp || compte.SERVEURSMTP;
-            const portSMTP    = parseInt(compte.PortSMTP || compte.portsmtp || 587) || 587;
-            // SecureSSL stocké comme TINYINT(1), peut être 0/1 ou true/false
-            const secureSSL   = !!(compte.SecureSSL || compte.securessl || compte.SECURESSL);
-            if (!serveurSMTP) {
-                return res.status(400).json({ error: `Le compte mail "${compte.LibelleMail || adresseMail}" n'a pas de serveur SMTP configuré. Vérifiez les paramètres dans Comptes Mails.` });
-            }
-            transporter = nodemailer.createTransport({
-                host: serveurSMTP,
-                port: portSMTP,
-                secure: secureSSL,
-                auth: { user: adresseMail, pass: motDePasse },
-                tls: { rejectUnauthorized: false },
-                connectionTimeout: SMTP_TIMEOUT,
-                greetingTimeout: SMTP_TIMEOUT,
-                socketTimeout: SMTP_TIMEOUT,
-            });
-            fromAddress = { AdresseMail: adresseMail, LibelleMail: compte.LibelleMail };
-        } else {
-            if (!process.env.SMTP_HOST) {
-                return res.status(400).json({ error: 'Aucun compte mail configuré. Ajoutez un compte dans Paramètres → Comptes Mails.' });
-            }
-            transporter = nodemailer.createTransport({
-                host: process.env.SMTP_HOST,
-                port: parseInt(process.env.SMTP_PORT) || 587,
-                secure: parseInt(process.env.SMTP_PORT) === 465,
-                auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-                tls: { rejectUnauthorized: false },
-                connectionTimeout: SMTP_TIMEOUT,
-                greetingTimeout: SMTP_TIMEOUT,
-                socketTimeout: SMTP_TIMEOUT,
-            });
-            fromAddress = { AdresseMail: process.env.SMTP_USER, LibelleMail: data.structure?.NomSociete || 'Soft Transit' };
+            fromEmail = compte.adressemail || compte.AdresseMail || fromEmail;
+            fromName  = compte.LibelleMail || societeName;
         }
 
-        // Quick SMTP connectivity check before generating PDF
-        try {
-            await transporter.verify();
-        } catch (smtpErr) {
-            const host = fromAddress.AdresseMail || '';
-            return res.status(400).json({
-                error: `Impossible de se connecter au serveur SMTP (${smtpErr.message}). Vérifiez le serveur, le port et le mot de passe dans Paramètres → Comptes Mails.`
-            });
-        }
+        // 3. Build HTML body
+        const bodyHtml = `
+            <div style="font-family:Arial,sans-serif;line-height:1.6;color:#333;max-width:600px">
+                <div style="background:linear-gradient(135deg,#1e3a8a,#1e40af);padding:24px 32px;border-radius:12px 12px 0 0">
+                    <h2 style="color:white;margin:0;font-size:20px">${societeName}</h2>
+                </div>
+                <div style="background:#f8fafc;padding:32px;border:1px solid #e2e8f0;border-radius:0 0 12px 12px">
+                    <p style="font-size:15px">Bonjour,</p>
+                    <p>Veuillez trouver ci-joint la facture <strong>${data.invoice.NumeroFacture}</strong> relative au dossier <strong>${data.invoice.CodeDossier || ''}</strong>.</p>
+                    ${customMessage ? `<p style="background:#fff;border-left:3px solid #1e40af;padding:12px 16px;border-radius:4px">${customMessage}</p>` : ''}
+                    ${documentIds.length > 0 ? `<p>Les documents associés au dossier sont également joints à cet e-mail.</p>` : ''}
+                    <p style="margin-top:24px">Cordialement,<br/><strong>L'équipe ${societeName}</strong></p>
+                </div>
+            </div>`;
 
-        // 3. Generate invoice PDF
+        // 4. Generate invoice PDF
         const pdfPath = await generator.generatePDF(invoiceId);
-        const attachments = [{
-            filename: `Facture_${data.invoice.NumeroFacture.replace(/\//g, '-')}.pdf`,
-            path: pdfPath
-        }];
+        const pdfBuffer = fs.readFileSync(pdfPath);
+        const pdfFilename = `Facture_${data.invoice.NumeroFacture.replace(/\//g, '-')}.pdf`;
 
-        // 4. Attach justificatifs (disk-based)
+        // 5. Build attachments list (base64 for Brevo API, buffer for SMTP)
+        // Each item: { filename, content: Buffer }
+        const attachmentBuffers = [{ filename: pdfFilename, content: pdfBuffer }];
+
+        // Justificatifs disk-based
         const [justificatifs] = await pool.query(
             'SELECT OriginalName, FilePath FROM liaisonfacturejustificatifs WHERE IDFactures = ?',
             [invoiceId]
@@ -546,11 +521,11 @@ router.post('/:id/send-email', checkPermission('FACTURES', 'can_view'), async (r
         justificatifs.forEach(j => {
             const absPath = path.isAbsolute(j.FilePath) ? j.FilePath : path.join(__dirname, '..', j.FilePath);
             if (fs.existsSync(absPath)) {
-                attachments.push({ filename: j.OriginalName, path: absPath });
+                attachmentBuffers.push({ filename: j.OriginalName, content: fs.readFileSync(absPath) });
             }
         });
 
-        // 5. Attach selected dossier documents (from R2 or disk)
+        // Selected dossier documents (R2 or disk)
         if (documentIds.length > 0) {
             const placeholders = documentIds.map(() => '?').join(',');
             const [docs] = await pool.query(
@@ -575,46 +550,105 @@ router.post('/:id/send-email', checkPermission('FACTURES', 'can_view'), async (r
                     }
                     const decryptedBuffer = decrypt(encryptedBuffer);
                     const filename = (doc.LibelleDocument || 'document') + path.extname(key);
-                    attachments.push({ filename, content: decryptedBuffer });
+                    attachmentBuffers.push({ filename, content: decryptedBuffer });
                 } catch (e) {
                     console.warn(`Impossible d'attacher le document ${doc.IDDocuments}:`, e.message);
                 }
             }
         }
 
-        // 6. Send email
-        const societeName = data.structure?.NomSociete || 'Soft Transit';
-        const subject = customObjet || `Facture ${data.invoice.NumeroFacture} — ${societeName}`;
-        const bodyHtml = `
-            <div style="font-family:Arial,sans-serif;line-height:1.6;color:#333;max-width:600px">
-                <div style="background:linear-gradient(135deg,#1e3a8a,#1e40af);padding:24px 32px;border-radius:12px 12px 0 0">
-                    <h2 style="color:white;margin:0;font-size:20px">${societeName}</h2>
-                </div>
-                <div style="background:#f8fafc;padding:32px;border:1px solid #e2e8f0;border-radius:0 0 12px 12px">
-                    <p style="font-size:15px">Bonjour,</p>
-                    <p>Veuillez trouver ci-joint la facture <strong>${data.invoice.NumeroFacture}</strong> relative au dossier <strong>${data.invoice.CodeDossier || ''}</strong>.</p>
-                    ${customMessage ? `<p style="background:#fff;border-left:3px solid #1e40af;padding:12px 16px;border-radius:4px">${customMessage}</p>` : ''}
-                    ${documentIds.length > 0 ? `<p>Les documents associés au dossier sont également joints à cet e-mail.</p>` : ''}
-                    <p style="margin-top:24px">Cordialement,<br/><strong>L'équipe ${societeName}</strong></p>
-                </div>
-            </div>`;
+        // 6. Send — Brevo API (HTTP 443, jamais bloqué) ou SMTP fallback
+        const BREVO_API_KEY = process.env.BREVO_API_KEY;
 
-        await transporter.sendMail({
-            from: `"${fromAddress.LibelleMail || societeName}" <${fromAddress.AdresseMail}>`,
-            to: clientEmail,
-            subject,
-            html: bodyHtml,
-            attachments
-        });
+        if (BREVO_API_KEY) {
+            // ── Brevo HTTP API ──────────────────────────────────────────────
+            const brevoAttachments = attachmentBuffers.map(a => ({
+                name:    a.filename,
+                content: Buffer.isBuffer(a.content) ? a.content.toString('base64') : Buffer.from(a.content).toString('base64'),
+            }));
+
+            await axios.post(
+                'https://api.brevo.com/v3/smtp/email',
+                {
+                    sender:      { email: fromEmail, name: fromName },
+                    to:          [{ email: clientEmail }],
+                    subject,
+                    htmlContent: bodyHtml,
+                    attachment:  brevoAttachments,
+                },
+                {
+                    headers: {
+                        'api-key':      BREVO_API_KEY,
+                        'Content-Type': 'application/json',
+                    },
+                    timeout: 30000,
+                }
+            );
+
+        } else {
+            // ── SMTP fallback (peut être bloqué sur Railway) ─────────────────
+            const nodemailer = require('nodemailer');
+            const SMTP_TIMEOUT = 20000;
+            let smtpConfig;
+
+            if (compteMailId) {
+                const [[compte]] = await pool.query(
+                    'SELECT * FROM comptesmails WHERE IDComptesMails = ? AND structur_id = ?',
+                    [compteMailId, req.structur_id]
+                );
+                if (!compte) return res.status(404).json({ error: 'Compte mail introuvable' });
+                const adresseMail = compte.adressemail || compte.AdresseMail;
+                const motDePasse  = compte.MotdePasse  || compte.MotDePasse;
+                const serveurSMTP = compte.ServeurSMTP || compte.serveursmtp;
+                const portSMTP    = parseInt(compte.PortSMTP || compte.portsmtp || 587) || 587;
+                const secureSSL   = !!(compte.SecureSSL || compte.securessl);
+                if (!serveurSMTP) {
+                    return res.status(400).json({ error: `Compte mail sans serveur SMTP. Configurez BREVO_API_KEY dans Railway ou renseignez le serveur SMTP.` });
+                }
+                smtpConfig = { host: serveurSMTP, port: portSMTP, secure: secureSSL, auth: { user: adresseMail, pass: motDePasse } };
+            } else {
+                if (!process.env.SMTP_HOST) {
+                    return res.status(400).json({ error: 'Aucun compte mail configuré. Ajoutez BREVO_API_KEY dans Railway ou un compte dans Paramètres → Comptes Mails.' });
+                }
+                smtpConfig = {
+                    host: process.env.SMTP_HOST, port: parseInt(process.env.SMTP_PORT) || 587,
+                    secure: parseInt(process.env.SMTP_PORT) === 465,
+                    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+                };
+            }
+
+            const transporter = nodemailer.createTransport({
+                ...smtpConfig,
+                tls: { rejectUnauthorized: false },
+                connectionTimeout: SMTP_TIMEOUT,
+                greetingTimeout: SMTP_TIMEOUT,
+                socketTimeout: SMTP_TIMEOUT,
+            });
+
+            try { await transporter.verify(); } catch (smtpErr) {
+                return res.status(400).json({
+                    error: `Impossible de se connecter au serveur SMTP (${smtpErr.message}). Railway bloque les ports SMTP — ajoutez BREVO_API_KEY dans les variables Railway pour contourner ce problème.`
+                });
+            }
+
+            const smtpAttachments = attachmentBuffers.map(a => ({ filename: a.filename, content: a.content }));
+            await transporter.sendMail({
+                from: `"${fromName}" <${fromEmail}>`,
+                to: clientEmail,
+                subject,
+                html: bodyHtml,
+                attachments: smtpAttachments,
+            });
+        }
 
         // 7. Mark as sent
         await pool.query('UPDATE factures SET dateenvoye = NOW() WHERE IDFactures = ?', [invoiceId]);
-
         res.json({ message: `E-mail envoyé avec succès à ${clientEmail}` });
 
     } catch (error) {
-        console.error('Error sending invoice email:', error);
-        res.status(500).json({ error: "Erreur lors de l'envoi : " + error.message });
+        console.error('Error sending invoice email:', error?.response?.data || error.message);
+        const brevoErr = error?.response?.data?.message;
+        res.status(500).json({ error: brevoErr ? `Erreur Brevo : ${brevoErr}` : "Erreur lors de l'envoi : " + error.message });
     }
 });
 

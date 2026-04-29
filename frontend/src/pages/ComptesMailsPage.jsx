@@ -435,6 +435,19 @@ export default function ComptesMailsPage() {
 
                             {/* ── Section: SMTP ── */}
                             <SectionTitle icon={Send} label="Envoi — Serveur SMTP" color="#0891b2" />
+                            <div style={{
+                                marginBottom: '1.25rem', padding: '11px 14px', borderRadius: '10px',
+                                background: '#fffbeb', border: '1.5px solid #fde68a',
+                                display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '12px',
+                            }}>
+                                <span style={{ fontSize: '16px', flexShrink: 0 }}>⚡</span>
+                                <div style={{ color: '#92400e', lineHeight: 1.5 }}>
+                                    <strong>Railway bloque les ports SMTP (25, 465, 587).</strong>
+                                    {' '}Pour l'envoi de factures, configurez la variable <code style={{ background: '#fef3c7', padding: '1px 5px', borderRadius: '4px' }}>BREVO_API_KEY</code> dans Railway
+                                    (compte gratuit sur <a href="https://www.brevo.com" target="_blank" rel="noreferrer" style={{ color: '#b45309' }}>brevo.com</a> → 300 mails/jour).
+                                    Les champs SMTP ci-dessous servent de référence et de fallback.
+                                </div>
+                            </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: '1.25rem', marginBottom: '1rem' }}>
                                 <FInput label="Hôte SMTP" required>
                                     <input name="ServeurSMTP" value={formData.ServeurSMTP} onChange={handleChange}
