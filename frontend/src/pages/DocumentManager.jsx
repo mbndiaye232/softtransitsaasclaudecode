@@ -143,10 +143,27 @@ export default function DocumentManager() {
         }
     }
 
-    const handleExtract = () => {
+    const handleExtract = async () => {
         if (!selectedDossier) return
-        const token = localStorage.getItem('token')
-        window.location.href = `${documentsAPI.extractUrl(selectedDossier)}?token=${token}`
+        try {
+            setLoading(true)
+            const res = await documentsAPI.extract(selectedDossier)
+            const blob = new Blob([res.data], { type: 'application/zip' })
+            const url = window.URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            const dossierCode = dossiers.find(d => String(d.id) === String(selectedDossier))?.code || selectedDossier
+            a.href = url
+            a.download = `${dossierCode}.zip`
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+            window.URL.revokeObjectURL(url)
+            toast('success', 'Archive téléchargée avec succès')
+        } catch (e) {
+            toast('error', 'Erreur lors de la création de l\'archive')
+        } finally {
+            setLoading(false)
+        }
     }
 
     const clientName  = clients.find(c => String(c.IDCLIENTS) === String(selectedClient))?.NomRS || ''
