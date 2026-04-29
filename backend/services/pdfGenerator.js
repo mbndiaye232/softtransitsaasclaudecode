@@ -292,8 +292,8 @@ class NoteDetailPDFGenerator {
         doc.font('Helvetica-Bold').text('Valeur march:', col3, y); // Using Data from OrdreTransit if available
         doc.font('Helvetica').text(ordreTransit?.ValeurMarchandise || 'ND', col3 + 80, y);
 
-        doc.font('Helvetica-Bold').text('Assurances en UM:', col4, y);
-        doc.font('Helvetica').text(`${this.formatNumber(assuranceCFA)} CFA`, col4 + 100, y);
+        doc.font('Helvetica-Bold').text('Assurances:', col4, y);
+        doc.font('Helvetica').text(`${this.formatNumber(assuranceCFA)} CFA`, col4 + 70, y);
 
         // Row 2
         y += rowHeight;
@@ -350,11 +350,12 @@ class NoteDetailPDFGenerator {
             { key: 'DPI', label: 'DPI' },
             { key: 'TitreExo', label: 'Titre Exo' },
             { key: 'Origine', label: 'Origine' },
+            { key: 'Provenance', label: 'Provenance' },
             { key: 'FOB', label: 'Valeur FOB devises', format: 'number' },
             { key: 'DeviseFOB', label: 'Devise FOB', fromSymbol: 'SymboleFOB' },
             { key: 'FOBCFA', label: 'Valeur FOB en UM', format: 'number' }, // UM = Unité Monétaire = CFA
             { key: 'FRETCFA', label: 'Valeur Fret en UM', format: 'number' },
-            { key: 'ASSURANCESCFA', label: 'Assurances en UM', format: 'number' },
+            { key: 'ASSURANCESCFA', label: 'Assurances', format: 'number' },
             { key: 'CommissionFournisseur', label: 'Commission en UM', format: 'number' },
             { key: 'CAF', label: 'Valeur CAF en UM', format: 'number' },
             { key: 'NBCOLIS', label: 'Nbre colis' },
