@@ -2,11 +2,15 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const { authMiddleware, tenantMiddleware, checkPermission } = require('../middleware/auth');
-const upload = require('../middleware/upload');
+const multer = require('multer');
 const { encrypt, decrypt } = require('../utils/encryption');
+const { uploadToR2, downloadFromR2, deleteFromR2 } = require('../utils/r2');
 const fs = require('fs');
 const path = require('path');
 const archive = require('archiver');
+
+// Multer memory storage for R2 uploads (no disk needed)
+const uploadMemory = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
 router.use(authMiddleware);
 router.use(tenantMiddleware);
@@ -36,8 +40,8 @@ router.get('/dossier/:dossierId', checkPermission('DOSSIERS', 'can_view'), async
     }
 });
 
-// POST /api/documents - Upload and encrypt a new document
-router.post('/', checkPermission('DOSSIERS', 'can_create'), upload.single('document'), async (req, res) => {
+// POST /api/documents - Upload, encrypt and store in Cloudflare R2
+router.post('/', checkPermission('DOSSIERS', 'can_create'), uploadMemory.single('document'), async (req, res) => {
     if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
     }
@@ -45,55 +49,77 @@ router.post('/', checkPermission('DOSSIERS', 'can_create'), upload.single('docum
     const { dossierId, title, description, number, typeId, date, observations } = req.body;
 
     try {
-        // Read file, encrypt it, and overwrite
-        const fileBuffer = fs.readFileSync(req.file.path);
-        const encryptedBuffer = encrypt(fileBuffer);
-        fs.writeFileSync(req.file.path, encryptedBuffer);
+        // Encrypt in memory
+        const encryptedBuffer = encrypt(req.file.buffer);
 
-        const filename = req.file.filename;
+        // Generate unique key for R2
+        const ext = path.extname(req.file.originalname);
+        const r2Key = `documents/${dossierId}/${Date.now()}_${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+
+        // Upload to Cloudflare R2
+        await uploadToR2(r2Key, encryptedBuffer, req.file.mimetype);
+
         const [result] = await pool.query(`
             INSERT INTO documents (
-                IDDossiers, LibelleDocument, DescriptionDocument, CheminDocument, 
+                IDDossiers, LibelleDocument, DescriptionDocument, CheminDocument,
                 NumeroDocument, IDTypesDocuments, DatePublication, Observations, IdAgent
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
-            dossierId, title, description, filename, 
+            dossierId, title, description, r2Key,
             number, typeId || null, date || null, observations || null, req.user.id
         ]);
 
         res.status(201).json({ id: result.insertId });
     } catch (error) {
-        console.error(error);
-        if (req.file) fs.unlinkSync(req.file.path);
+        console.error('Upload error:', error);
         res.status(500).json({ error: 'Server error during upload/encryption' });
     }
 });
 
-// GET /api/documents/:id/view - Decrypt and stream document
+// GET /api/documents/:id/view - Fetch from R2, decrypt and stream
 router.get('/:id/view', checkPermission('DOSSIERS', 'can_view'), async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT CheminDocument, LibelleDocument FROM documents WHERE IDDocuments = ?', [req.params.id]);
         if (rows.length === 0) return res.status(404).json({ error: 'Document not found' });
 
         const doc = rows[0];
-        const filePath = path.join('uploads', 'others', doc.CheminDocument); // Adjust based on upload destination
+        const r2Key = doc.CheminDocument;
 
-        if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found on disk' });
-
-        const encryptedBuffer = fs.readFileSync(filePath);
-        const decryptedBuffer = decrypt(encryptedBuffer);
-
-        // Determine content type (could be stored in DB, but we can guess from extension)
-        const ext = path.extname(doc.CheminDocument).toLowerCase();
+        // Determine content type from extension
+        const ext = path.extname(r2Key).toLowerCase();
         let contentType = 'application/octet-stream';
         if (ext === '.pdf') contentType = 'application/pdf';
-        else if (['.jpg', '.jpeg', '.png', '.gif'].includes(ext)) contentType = `image/${ext.substring(1)}`;
+        else if (['.jpg', '.jpeg'].includes(ext)) contentType = 'image/jpeg';
+        else if (ext === '.png') contentType = 'image/png';
+        else if (ext === '.gif') contentType = 'image/gif';
+        else if (['.doc', '.docx'].includes(ext)) contentType = 'application/msword';
+        else if (ext === '.xlsx') contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+        // Download from R2 (try R2 key first, fallback to old disk path for legacy docs)
+        let decryptedBuffer;
+        if (r2Key.startsWith('documents/')) {
+            // New R2 storage
+            const encryptedBuffer = await downloadFromR2(r2Key);
+            decryptedBuffer = decrypt(encryptedBuffer);
+        } else {
+            // Legacy: file stored on disk (old uploads before R2 migration)
+            const legacyPaths = [
+                path.join('uploads', 'others', r2Key),
+                path.join('uploads', 'dossiers', r2Key),
+                path.join('uploads', r2Key),
+            ];
+            const legacyPath = legacyPaths.find(p => fs.existsSync(p));
+            if (!legacyPath) return res.status(404).json({ error: 'Fichier introuvable sur le disque' });
+            const encryptedBuffer = fs.readFileSync(legacyPath);
+            decryptedBuffer = decrypt(encryptedBuffer);
+        }
 
         res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `inline; filename="${doc.LibelleDocument || path.basename(r2Key)}"`);
         res.send(decryptedBuffer);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error during decryption' });
+        console.error('View error:', error);
+        res.status(500).json({ error: 'Erreur lors de la récupération du document' });
     }
 });
 
