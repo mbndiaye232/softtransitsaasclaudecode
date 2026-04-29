@@ -483,18 +483,20 @@ router.post('/:id/send-email', checkPermission('FACTURES', 'can_view'), async (r
                 [compteMailId, req.structur_id]
             );
             if (!compte) return res.status(404).json({ error: 'Compte mail introuvable' });
-            // DB columns: adressemail (lowercase), MotdePasse (lowercase d), ServeurSMTP, PortSMTP
+            // DB columns: adressemail (lowercase), MotdePasse (lowercase d), ServeurSMTP, PortSMTP, SecureSSL
             const adresseMail = compte.adressemail || compte.AdresseMail || compte.ADRESSEMAIL;
             const motDePasse  = compte.MotdePasse  || compte.MotDePasse  || compte.MOTDEPASSE;
             const serveurSMTP = compte.ServeurSMTP || compte.serveursmtp || compte.SERVEURSMTP;
             const portSMTP    = parseInt(compte.PortSMTP || compte.portsmtp || 587) || 587;
+            // SecureSSL stocké comme TINYINT(1), peut être 0/1 ou true/false
+            const secureSSL   = !!(compte.SecureSSL || compte.securessl || compte.SECURESSL);
             if (!serveurSMTP) {
                 return res.status(400).json({ error: `Le compte mail "${compte.LibelleMail || adresseMail}" n'a pas de serveur SMTP configuré. Vérifiez les paramètres dans Comptes Mails.` });
             }
             transporter = nodemailer.createTransport({
                 host: serveurSMTP,
                 port: portSMTP,
-                secure: portSMTP === 465,
+                secure: secureSSL,
                 auth: { user: adresseMail, pass: motDePasse },
                 tls: { rejectUnauthorized: false },
                 connectionTimeout: SMTP_TIMEOUT,

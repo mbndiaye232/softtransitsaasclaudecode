@@ -99,7 +99,7 @@ export default function ComptesMailsPage() {
     const [selectedId, setSelectedId] = useState(null)
     const [formData, setFormData] = useState({
         AdresseMail: '', MotDePasse: '', LibelleMail: '',
-        ServeurSMTP: '', PortSMTP: '587',
+        ServeurSMTP: '', PortSMTP: '587', SecureSSL: false,
         ServeurPOP: '', PortPOP: '110',
         ServeurIMAPEntrant: '', PortIMAPEntrant: '143',
         ServeurIMAPSortant: '', PortIMAPSortant: '587',
@@ -135,6 +135,7 @@ export default function ComptesMailsPage() {
             LibelleMail:        acc.LibelleMail        || '',
             ServeurSMTP:        acc.ServeurSMTP        || '',
             PortSMTP:           acc.PortSMTP           || '587',
+            SecureSSL:          !!(acc.SecureSSL || acc.securessl),
             ServeurPOP:         acc.ServeurPOP         || '',
             PortPOP:            acc.PortPOP            || '110',
             ServeurIMAPEntrant:  acc.ServeurIMAPEntrant  || '',
@@ -149,7 +150,7 @@ export default function ComptesMailsPage() {
         setSelectedId('new')
         setFormData({
             AdresseMail: '', MotDePasse: '', LibelleMail: '',
-            ServeurSMTP: '', PortSMTP: '587',
+            ServeurSMTP: '', PortSMTP: '587', SecureSSL: false,
             ServeurPOP: '', PortPOP: '110',
             ServeurIMAPEntrant: '', PortIMAPEntrant: '143',
             ServeurIMAPSortant: '', PortIMAPSortant: '587',
@@ -158,8 +159,8 @@ export default function ComptesMailsPage() {
     }
 
     const handleChange = (e) => {
-        const { name, value } = e.target
-        setFormData(prev => ({ ...prev, [name]: value }))
+        const { name, value, type, checked } = e.target
+        setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }))
     }
 
     const handleSubmit = async (e) => {
@@ -198,7 +199,7 @@ export default function ComptesMailsPage() {
         setTesting(true)
         setTestResult(null)
         try {
-            const res = await comptesMailsAPI.test(formData)
+            const res = await comptesMailsAPI.test({ ...formData, SecureSSL: formData.SecureSSL })
             setTestResult({ success: true, message: res.data.message })
         } catch (err) {
             setTestResult({
@@ -443,6 +444,51 @@ export default function ComptesMailsPage() {
                                     <input name="PortSMTP" value={formData.PortSMTP} onChange={handleChange}
                                         placeholder="587" style={inputStyle} />
                                 </FInput>
+                            </div>
+                            {/* SSL/TLS toggle */}
+                            <div style={{ marginBottom: '1.5rem' }}>
+                                <label style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: '10px',
+                                    cursor: 'pointer', userSelect: 'none',
+                                    padding: '10px 16px',
+                                    background: formData.SecureSSL ? '#ecfdf5' : '#f8fafc',
+                                    border: `1.5px solid ${formData.SecureSSL ? '#6ee7b7' : '#e2e8f0'}`,
+                                    borderRadius: '10px', transition: 'all 0.2s',
+                                }}>
+                                    <div style={{ position: 'relative', width: '40px', height: '22px', flexShrink: 0 }}>
+                                        <input
+                                            type="checkbox"
+                                            name="SecureSSL"
+                                            checked={!!formData.SecureSSL}
+                                            onChange={handleChange}
+                                            style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+                                        />
+                                        <div style={{
+                                            position: 'absolute', inset: 0, borderRadius: '99px',
+                                            background: formData.SecureSSL ? '#10b981' : '#cbd5e1',
+                                            transition: 'background 0.2s',
+                                        }} />
+                                        <div style={{
+                                            position: 'absolute',
+                                            top: '3px',
+                                            left: formData.SecureSSL ? '21px' : '3px',
+                                            width: '16px', height: '16px', borderRadius: '50%',
+                                            background: 'white',
+                                            boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                                            transition: 'left 0.2s',
+                                        }} />
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: '13px', fontWeight: 800, color: formData.SecureSSL ? '#065f46' : '#475569' }}>
+                                            SSL / TLS {formData.SecureSSL ? '— Activé' : '— Désactivé'}
+                                        </div>
+                                        <div style={{ fontSize: '11px', color: formData.SecureSSL ? '#059669' : '#94a3b8', marginTop: '1px' }}>
+                                            {formData.SecureSSL
+                                                ? 'Connexion chiffrée SSL/TLS directe (recommandé pour port 465 OVH)'
+                                                : 'STARTTLS ou non chiffré — utilisez port 587 ou 25'}
+                                        </div>
+                                    </div>
+                                </label>
                             </div>
                             {/* Test result */}
                             {testResult && (

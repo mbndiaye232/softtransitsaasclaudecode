@@ -30,22 +30,23 @@ router.get('/', checkPermission('CONFIG', 'can_view'), async (req, res) => {
  * Create a new email account
  */
 router.post('/', checkPermission('CONFIG', 'can_edit'), async (req, res) => {
-    const { 
-        AdresseMail, MotDePasse, LibelleMail, 
-        ServeurSMTP, PortSMTP, ServeurPOP, PortPOP, 
-        ServeurIMAPEntrant, PortIMAPEntrant, ServeurIMAPSortant, PortIMAPSortant 
+    const {
+        AdresseMail, MotDePasse, LibelleMail,
+        ServeurSMTP, PortSMTP, SecureSSL,
+        ServeurPOP, PortPOP,
+        ServeurIMAPEntrant, PortIMAPEntrant, ServeurIMAPSortant, PortIMAPSortant
     } = req.body;
-    
+
     try {
         const [result] = await pool.query(
             `INSERT INTO comptesmails (
-                AdresseMail, MotDePasse, LibelleMail, ServeurSMTP, PortSMTP, 
-                ServeurPOP, PortPOP, ServeurIMAPEntrant, PortIMAPEntrant, 
+                AdresseMail, MotDePasse, LibelleMail, ServeurSMTP, PortSMTP, SecureSSL,
+                ServeurPOP, PortPOP, ServeurIMAPEntrant, PortIMAPEntrant,
                 ServeurIMAPSortant, PortIMAPSortant, structur_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                AdresseMail, MotDePasse, LibelleMail, ServeurSMTP, PortSMTP || '587', 
-                ServeurPOP || null, PortPOP || '110', ServeurIMAPEntrant || null, PortIMAPEntrant || '143', 
+                AdresseMail, MotDePasse, LibelleMail, ServeurSMTP, PortSMTP || '587', SecureSSL ? 1 : 0,
+                ServeurPOP || null, PortPOP || '110', ServeurIMAPEntrant || null, PortIMAPEntrant || '143',
                 ServeurIMAPSortant || null, PortIMAPSortant || '587', req.structur_id
             ]
         );
@@ -62,22 +63,23 @@ router.post('/', checkPermission('CONFIG', 'can_edit'), async (req, res) => {
  */
 router.put('/:id', checkPermission('CONFIG', 'can_edit'), async (req, res) => {
     const { id } = req.params;
-    const { 
-        AdresseMail, MotDePasse, LibelleMail, 
-        ServeurSMTP, PortSMTP, ServeurPOP, PortPOP, 
-        ServeurIMAPEntrant, PortIMAPEntrant, ServeurIMAPSortant, PortIMAPSortant 
+    const {
+        AdresseMail, MotDePasse, LibelleMail,
+        ServeurSMTP, PortSMTP, SecureSSL,
+        ServeurPOP, PortPOP,
+        ServeurIMAPEntrant, PortIMAPEntrant, ServeurIMAPSortant, PortIMAPSortant
     } = req.body;
 
     try {
         await pool.query(
-            `UPDATE comptesmails SET 
-                AdresseMail = ?, MotDePasse = ?, LibelleMail = ?, ServeurSMTP = ?, PortSMTP = ?, 
-                ServeurPOP = ?, PortPOP = ?, ServeurIMAPEntrant = ?, PortIMAPEntrant = ?, 
+            `UPDATE comptesmails SET
+                AdresseMail = ?, MotDePasse = ?, LibelleMail = ?, ServeurSMTP = ?, PortSMTP = ?, SecureSSL = ?,
+                ServeurPOP = ?, PortPOP = ?, ServeurIMAPEntrant = ?, PortIMAPEntrant = ?,
                 ServeurIMAPSortant = ?, PortIMAPSortant = ?
             WHERE IDComptesMails = ? AND structur_id = ?`,
             [
-                AdresseMail, MotDePasse, LibelleMail, ServeurSMTP, PortSMTP, 
-                ServeurPOP, PortPOP, ServeurIMAPEntrant, PortIMAPEntrant, 
+                AdresseMail, MotDePasse, LibelleMail, ServeurSMTP, PortSMTP, SecureSSL ? 1 : 0,
+                ServeurPOP, PortPOP, ServeurIMAPEntrant, PortIMAPEntrant,
                 ServeurIMAPSortant, PortIMAPSortant, id, req.structur_id
             ]
         );
@@ -108,23 +110,27 @@ router.delete('/:id', checkPermission('CONFIG', 'can_edit'), async (req, res) =>
  * Test SMTP connection
  */
 router.post('/test', checkPermission('CONFIG', 'can_edit'), async (req, res) => {
-    const { ServeurSMTP, PortSMTP, AdresseMail, MotDePasse } = req.body;
+    const { ServeurSMTP, PortSMTP, AdresseMail, MotDePasse, SecureSSL } = req.body;
 
     if (!ServeurSMTP || !PortSMTP || !AdresseMail || !MotDePasse) {
         return res.status(400).json({ error: 'Missing required parameters for test' });
     }
 
+    const portNum = parseInt(PortSMTP);
+    const useSSL  = SecureSSL === true || SecureSSL === 1 || SecureSSL === '1';
+
     const transporter = nodemailer.createTransport({
         host: ServeurSMTP,
-        port: parseInt(PortSMTP),
-        secure: parseInt(PortSMTP) === 465,
+        port: portNum,
+        secure: useSSL,
         auth: {
             user: AdresseMail,
             pass: MotDePasse
         },
-        tls: {
-            rejectUnauthorized: false // Common in local/internal environments
-        }
+        tls: { rejectUnauthorized: false },
+        connectionTimeout: 20000,
+        greetingTimeout: 20000,
+        socketTimeout: 20000,
     });
 
     try {
