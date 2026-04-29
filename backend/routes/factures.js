@@ -483,21 +483,25 @@ router.post('/:id/send-email', checkPermission('FACTURES', 'can_view'), async (r
                 [compteMailId, req.structur_id]
             );
             if (!compte) return res.status(404).json({ error: 'Compte mail introuvable' });
-            if (!compte.ServeurSMTP || !compte.AdresseMail) {
-                return res.status(400).json({ error: `Le compte mail "${compte.LibelleMail || compte.AdresseMail}" n'a pas de serveur SMTP configuré. Vérifiez les paramètres dans Comptes Mails.` });
+            // DB columns: adressemail (lowercase), MotdePasse (lowercase d), ServeurSMTP, PortSMTP
+            const adresseMail = compte.adressemail || compte.AdresseMail || compte.ADRESSEMAIL;
+            const motDePasse  = compte.MotdePasse  || compte.MotDePasse  || compte.MOTDEPASSE;
+            const serveurSMTP = compte.ServeurSMTP || compte.serveursmtp || compte.SERVEURSMTP;
+            const portSMTP    = parseInt(compte.PortSMTP || compte.portsmtp || 587) || 587;
+            if (!serveurSMTP) {
+                return res.status(400).json({ error: `Le compte mail "${compte.LibelleMail || adresseMail}" n'a pas de serveur SMTP configuré. Vérifiez les paramètres dans Comptes Mails.` });
             }
-            const port = parseInt(compte.PortSMTP) || 587;
             transporter = nodemailer.createTransport({
-                host: compte.ServeurSMTP,
-                port,
-                secure: port === 465,
-                auth: { user: compte.AdresseMail, pass: compte.MotDePasse },
+                host: serveurSMTP,
+                port: portSMTP,
+                secure: portSMTP === 465,
+                auth: { user: adresseMail, pass: motDePasse },
                 tls: { rejectUnauthorized: false },
                 connectionTimeout: SMTP_TIMEOUT,
                 greetingTimeout: SMTP_TIMEOUT,
                 socketTimeout: SMTP_TIMEOUT,
             });
-            fromAddress = { AdresseMail: compte.AdresseMail, LibelleMail: compte.LibelleMail };
+            fromAddress = { AdresseMail: adresseMail, LibelleMail: compte.LibelleMail };
         } else {
             if (!process.env.SMTP_HOST) {
                 return res.status(400).json({ error: 'Aucun compte mail configuré. Ajoutez un compte dans Paramètres → Comptes Mails.' });

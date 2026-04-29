@@ -1037,7 +1037,7 @@ const FacturationManager = ({ dossierId }) => {
                                     >
                                         {comptesMails.map(c => (
                                             <option key={c.IDComptesMails} value={c.IDComptesMails}>
-                                                {c.LibelleMail ? `${c.LibelleMail} <${c.AdresseMail}>` : c.AdresseMail}
+                                                {[c.LibelleMail, c.adressemail || c.AdresseMail].filter(Boolean).join(' — ')}
                                             </option>
                                         ))}
                                     </select>

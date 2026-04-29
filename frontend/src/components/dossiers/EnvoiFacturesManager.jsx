@@ -285,7 +285,7 @@ Dans l'attente de votre règlement, nous vous prions d'agréer, Madame, Monsieur
                                             >
                                                 {comptesMails.map(c => (
                                                     <option key={c.IDComptesMails} value={c.IDComptesMails}>
-                                                        {[c.LibelleMail, c.AdresseMail].filter(Boolean).join(' — ')}
+                                                        {[c.LibelleMail, c.adressemail || c.AdresseMail].filter(Boolean).join(' — ')}
                                                     </option>
                                                 ))}
                                             </select>
