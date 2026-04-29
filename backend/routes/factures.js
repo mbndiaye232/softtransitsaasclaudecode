@@ -474,33 +474,56 @@ router.post('/:id/send-email', checkPermission('FACTURES', 'can_view'), async (r
 
         // 2. Load mail account credentials
         let transporter;
+        let fromAddress;
+        const SMTP_TIMEOUT = 20000; // 20s
+
         if (compteMailId) {
             const [[compte]] = await pool.query(
                 'SELECT * FROM comptesmails WHERE IDComptesMails = ? AND structur_id = ?',
                 [compteMailId, req.structur_id]
             );
             if (!compte) return res.status(404).json({ error: 'Compte mail introuvable' });
+            if (!compte.ServeurSMTP || !compte.AdresseMail) {
+                return res.status(400).json({ error: `Le compte mail "${compte.LibelleMail || compte.AdresseMail}" n'a pas de serveur SMTP configuré. Vérifiez les paramètres dans Comptes Mails.` });
+            }
+            const port = parseInt(compte.PortSMTP) || 587;
             transporter = nodemailer.createTransport({
                 host: compte.ServeurSMTP,
-                port: parseInt(compte.PortSMTP) || 587,
-                secure: parseInt(compte.PortSMTP) === 465,
+                port,
+                secure: port === 465,
                 auth: { user: compte.AdresseMail, pass: compte.MotDePasse },
-                tls: { rejectUnauthorized: false }
+                tls: { rejectUnauthorized: false },
+                connectionTimeout: SMTP_TIMEOUT,
+                greetingTimeout: SMTP_TIMEOUT,
+                socketTimeout: SMTP_TIMEOUT,
             });
+            fromAddress = { AdresseMail: compte.AdresseMail, LibelleMail: compte.LibelleMail };
         } else {
-            // Fallback: global SMTP
+            if (!process.env.SMTP_HOST) {
+                return res.status(400).json({ error: 'Aucun compte mail configuré. Ajoutez un compte dans Paramètres → Comptes Mails.' });
+            }
             transporter = nodemailer.createTransport({
                 host: process.env.SMTP_HOST,
                 port: parseInt(process.env.SMTP_PORT) || 587,
-                secure: false,
+                secure: parseInt(process.env.SMTP_PORT) === 465,
                 auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-                tls: { rejectUnauthorized: false }
+                tls: { rejectUnauthorized: false },
+                connectionTimeout: SMTP_TIMEOUT,
+                greetingTimeout: SMTP_TIMEOUT,
+                socketTimeout: SMTP_TIMEOUT,
             });
+            fromAddress = { AdresseMail: process.env.SMTP_USER, LibelleMail: data.structure?.NomSociete || 'Soft Transit' };
         }
 
-        const fromAddress = compteMailId
-            ? (await pool.query('SELECT AdresseMail, LibelleMail FROM comptesmails WHERE IDComptesMails = ?', [compteMailId]))[0][0]
-            : { AdresseMail: process.env.SMTP_USER, LibelleMail: data.structure?.NomSociete || 'Soft Transit' };
+        // Quick SMTP connectivity check before generating PDF
+        try {
+            await transporter.verify();
+        } catch (smtpErr) {
+            const host = fromAddress.AdresseMail || '';
+            return res.status(400).json({
+                error: `Impossible de se connecter au serveur SMTP (${smtpErr.message}). Vérifiez le serveur, le port et le mot de passe dans Paramètres → Comptes Mails.`
+            });
+        }
 
         // 3. Generate invoice PDF
         const pdfPath = await generator.generatePDF(invoiceId);
