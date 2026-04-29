@@ -91,14 +91,29 @@ router.post('/', async (req, res) => {
         const totalHT = totalHTDouane + totalHTDebours + totalHTPrestations;
         const totalTTC = totalHT + totalTVA;
 
-        // 4. Insert into factures table
+        // 4. Compute DateEcheance from client payment terms
+        // FD → DelaiReglementDouane days, FP/FG → DelaiReglement days
+        const [[clientRow]] = await connection.query(
+            `SELECT c.DelaiReglement, c.DelaiReglementDouane
+             FROM dossiers d JOIN clients c ON d.IDCLIENTS = c.IDCLIENTS
+             WHERE d.IDDossiers = ? LIMIT 1`,
+            [idDossier]
+        );
+        const delaiJours = prefix === 'FD'
+            ? (parseInt(clientRow?.DelaiReglementDouane) || 0)
+            : (parseInt(clientRow?.DelaiReglement) || 0);
+        const dateEcheance = delaiJours > 0
+            ? new Date(Date.now() + delaiJours * 86400000).toISOString().slice(0, 10)
+            : null;
+
+        // 5. Insert into factures table
         const [result] = await connection.query(
             `INSERT INTO factures (
-                IDDossiers, NumeroFacture, MontantHTFacture, MontantTVAFacture, 
+                IDDossiers, NumeroFacture, MontantHTFacture, MontantTVAFacture,
                 MontantTTCFacture, IDAgents, Observations, DateFacture, structur_id,
-                Validee, MontantRegleFacture, ReliquatFacture
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, 0, 0, ?)`,
-            [idDossier, numeroFacture, totalHT, totalTVA, totalTTC, idAgent, observations, structurId, totalTTC]
+                Validee, MontantRegleFacture, ReliquatFacture, DateEcheance
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, 0, 0, ?, ?)`,
+            [idDossier, numeroFacture, totalHT, totalTVA, totalTTC, idAgent, observations, structurId, totalTTC, dateEcheance]
         );
 
         const idFacture = result.insertId;
@@ -154,16 +169,35 @@ router.get('/:id/pdf', async (req, res) => {
 router.get('/dossier/:dossierId', async (req, res) => {
     try {
         const [rows] = await pool.query(
-            `SELECT f.*, u.NomAgent as AgentName, c.EmailClient, c.NomRS as ClientName
-             FROM factures f 
-             LEFT JOIN agents u ON f.IDAgents = u.IDAgents 
+            `SELECT f.*,
+                    u.NomAgent as AgentName,
+                    c.EmailClient, c.NomRS as ClientName,
+                    c.DelaiReglement, c.DelaiReglementDouane,
+                    d.CodeDossier, d.Libelle as LibelleDossier, d.CodeDossierCourt
+             FROM factures f
+             LEFT JOIN agents u ON f.IDAgents = u.IDAgents
              JOIN dossiers d ON f.IDDossiers = d.IDDossiers
              JOIN clients c ON d.IDCLIENTS = c.IDCLIENTS
-             WHERE f.IDDossiers = ? 
+             WHERE f.IDDossiers = ?
              ORDER BY f.DateFacture DESC`,
             [req.params.dossierId]
         );
-        res.json(rows);
+        // Compute DateEcheance on-the-fly for invoices that don't have one yet
+        const enriched = rows.map(f => {
+            if (!f.DateEcheance && f.DateFacture) {
+                const prefix = (f.NumeroFacture || '').substring(0, 2);
+                const delai = prefix === 'FD'
+                    ? parseInt(f.DelaiReglementDouane) || 0
+                    : parseInt(f.DelaiReglement) || 0;
+                if (delai > 0) {
+                    const d = new Date(f.DateFacture);
+                    d.setDate(d.getDate() + delai);
+                    f.DateEcheance = d.toISOString().slice(0, 10);
+                }
+            }
+            return f;
+        });
+        res.json(enriched);
     } catch (error) {
         console.error('Error fetching invoices:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -424,7 +458,7 @@ router.delete('/justificatifs/:id', checkPermission('FACTURES', 'can_edit'), asy
 router.post('/:id/send-email', checkPermission('FACTURES', 'can_view'), async (req, res) => {
     try {
         const invoiceId = req.params.id;
-        const { compteMailId, emailDestinataire, documentIds = [], message: customMessage } = req.body;
+        const { compteMailId, emailDestinataire, documentIds = [], message: customMessage, objet: customObjet } = req.body;
         const nodemailer = require('nodemailer');
         const { downloadFromR2 } = require('../utils/r2');
         const { decrypt } = require('../utils/encryption');
@@ -521,7 +555,7 @@ router.post('/:id/send-email', checkPermission('FACTURES', 'can_view'), async (r
 
         // 6. Send email
         const societeName = data.structure?.NomSociete || 'Soft Transit';
-        const subject = `Facture ${data.invoice.NumeroFacture} — ${societeName}`;
+        const subject = customObjet || `Facture ${data.invoice.NumeroFacture} — ${societeName}`;
         const bodyHtml = `
             <div style="font-family:Arial,sans-serif;line-height:1.6;color:#333;max-width:600px">
                 <div style="background:linear-gradient(135deg,#1e3a8a,#1e40af);padding:24px 32px;border-radius:12px 12px 0 0">
