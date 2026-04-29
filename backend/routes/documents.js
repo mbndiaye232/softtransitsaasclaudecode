@@ -137,39 +137,54 @@ router.get('/:id/view', checkPermission('DOSSIERS', 'can_view'), async (req, res
     }
 });
 
-// GET /api/documents/dossier/:dossierId/extract - Bulk extraction
+// GET /api/documents/dossier/:dossierId/extract - Bulk extraction (ZIP)
 router.get('/dossier/:dossierId/extract', checkPermission('DOSSIERS', 'can_view'), async (req, res) => {
     try {
         const [dossierRows] = await pool.query('SELECT CodeDossierCourt FROM dossiers WHERE IDDossiers = ?', [req.params.dossierId]);
         if (dossierRows.length === 0) return res.status(404).json({ error: 'Dossier not found' });
-        
-        const shortCode = dossierRows[0].CodeDossierCourt.replace(/[^a-zA-Z0-9]/g, '_');
-        
+
+        const shortCode = (dossierRows[0].CodeDossierCourt || 'dossier').replace(/[^a-zA-Z0-9]/g, '_');
+
         const [docs] = await pool.query('SELECT CheminDocument, LibelleDocument FROM documents WHERE IDDossiers = ?', [req.params.dossierId]);
         if (docs.length === 0) return res.status(400).json({ error: 'No documents to extract' });
 
         res.setHeader('Content-Type', 'application/zip');
-        res.setHeader('Content-Disposition', `attachment; filename=${shortCode}_documents.zip`);
+        res.setHeader('Content-Disposition', `attachment; filename="${shortCode}.zip"`);
 
         const zip = archive('zip', { zlib: { level: 9 } });
         zip.pipe(res);
 
         for (const doc of docs) {
-            const filePath = path.join('uploads', 'others', doc.CheminDocument);
-            if (fs.existsSync(filePath)) {
-                const encryptedBuffer = fs.readFileSync(filePath);
-                try {
-                    const decryptedBuffer = decrypt(encryptedBuffer);
-                    zip.append(decryptedBuffer, { name: doc.LibelleDocument + path.extname(doc.CheminDocument) });
-                } catch (e) {
-                    console.error(`Failed to decrypt ${doc.CheminDocument}`, e);
+            try {
+                let encryptedBuffer;
+                const key = doc.CheminDocument;
+
+                if (key.startsWith('documents/')) {
+                    // Stored in R2
+                    encryptedBuffer = await downloadFromR2(key);
+                } else {
+                    // Legacy disk fallback
+                    const legacyPaths = [
+                        path.join('uploads', 'others', key),
+                        path.join('uploads', 'dossiers', key),
+                        path.join('uploads', key),
+                    ];
+                    const legacyPath = legacyPaths.find(p => fs.existsSync(p));
+                    if (!legacyPath) { console.warn(`File not found on disk: ${key}`); continue; }
+                    encryptedBuffer = fs.readFileSync(legacyPath);
                 }
+
+                const decryptedBuffer = decrypt(encryptedBuffer);
+                const filename = (doc.LibelleDocument || 'document') + path.extname(key);
+                zip.append(decryptedBuffer, { name: filename });
+            } catch (e) {
+                console.error(`Failed to process ${doc.CheminDocument}:`, e.message);
             }
         }
 
         zip.finalize();
     } catch (error) {
-        console.error(error);
+        console.error('Extract error:', error);
         res.status(500).json({ error: 'Extraction failed' });
     }
 });

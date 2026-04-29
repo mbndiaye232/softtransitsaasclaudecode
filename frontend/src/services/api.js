@@ -353,7 +353,7 @@ export const documentsAPI = {
     create: (data) => api.post('/documents', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
     view: (id) => api.get(`/documents/${id}/view`, { responseType: 'blob' }),
     viewUrl: (id) => `${API_URL}/documents/${id}/view`,
-    extractUrl: (dossierId) => api.get(`/documents/dossier/${dossierId}/extract`),
+    extract: (dossierId) => api.get(`/documents/dossier/${dossierId}/extract`, { responseType: 'blob' }),
     delete: (id) => api.delete(`/documents/${id}`)
 };
 
