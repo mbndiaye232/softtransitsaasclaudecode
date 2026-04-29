@@ -418,79 +418,140 @@ router.delete('/justificatifs/:id', checkPermission('FACTURES', 'can_edit'), asy
 
 /**
  * POST /api/factures/:id/send-email
- * Send invoice PDF + justificatifs to the client
+ * Send invoice PDF + dossier documents to the client
+ * Body: { compteMailId, emailDestinataire, documentIds: [id, ...], message }
  */
 router.post('/:id/send-email', checkPermission('FACTURES', 'can_view'), async (req, res) => {
     try {
         const invoiceId = req.params.id;
+        const { compteMailId, emailDestinataire, documentIds = [], message: customMessage } = req.body;
+        const nodemailer = require('nodemailer');
+        const { downloadFromR2 } = require('../utils/r2');
+        const { decrypt } = require('../utils/encryption');
 
-        // 1. Fetch Invoice, Client info and Justificatifs
+        // 1. Fetch invoice + client data
         const InvoicePDFGenerator = require('../services/InvoicePDFGenerator');
         const generator = new InvoicePDFGenerator(pool);
-
         const data = await generator.fetchInvoiceData(invoiceId);
         if (!data.invoice) return res.status(404).json({ error: 'Facture introuvable' });
 
-        const clientEmail = data.invoice.EmailClient;
-        if (!clientEmail) {
-            return res.status(400).json({ error: 'Le client n\'a pas d\'adresse e-mail renseignée' });
+        const clientEmail = emailDestinataire || data.invoice.EmailClient;
+        if (!clientEmail) return res.status(400).json({ error: "Le client n'a pas d'adresse e-mail renseignée" });
+
+        // 2. Load mail account credentials
+        let transporter;
+        if (compteMailId) {
+            const [[compte]] = await pool.query(
+                'SELECT * FROM comptesmails WHERE IDComptesMails = ? AND structur_id = ?',
+                [compteMailId, req.structur_id]
+            );
+            if (!compte) return res.status(404).json({ error: 'Compte mail introuvable' });
+            transporter = nodemailer.createTransport({
+                host: compte.ServeurSMTP,
+                port: parseInt(compte.PortSMTP) || 587,
+                secure: parseInt(compte.PortSMTP) === 465,
+                auth: { user: compte.AdresseMail, pass: compte.MotDePasse },
+                tls: { rejectUnauthorized: false }
+            });
+        } else {
+            // Fallback: global SMTP
+            transporter = nodemailer.createTransport({
+                host: process.env.SMTP_HOST,
+                port: parseInt(process.env.SMTP_PORT) || 587,
+                secure: false,
+                auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+                tls: { rejectUnauthorized: false }
+            });
         }
 
-        // 2. Generate/Get Invoice PDF
-        const pdfPath = await generator.generatePDF(invoiceId);
+        const fromAddress = compteMailId
+            ? (await pool.query('SELECT AdresseMail, LibelleMail FROM comptesmails WHERE IDComptesMails = ?', [compteMailId]))[0][0]
+            : { AdresseMail: process.env.SMTP_USER, LibelleMail: data.structure?.NomSociete || 'Soft Transit' };
 
-        // 3. Get justificatifs
+        // 3. Generate invoice PDF
+        const pdfPath = await generator.generatePDF(invoiceId);
+        const attachments = [{
+            filename: `Facture_${data.invoice.NumeroFacture.replace(/\//g, '-')}.pdf`,
+            path: pdfPath
+        }];
+
+        // 4. Attach justificatifs (disk-based)
         const [justificatifs] = await pool.query(
             'SELECT OriginalName, FilePath FROM liaisonfacturejustificatifs WHERE IDFactures = ?',
             [invoiceId]
         );
-
-        // 4. Prepare attachments
-        const attachments = [
-            {
-                filename: `Facture_${data.invoice.NumeroFacture.replace(/\//g, '-')}.pdf`,
-                path: pdfPath
-            }
-        ];
-
         justificatifs.forEach(j => {
             const absPath = path.isAbsolute(j.FilePath) ? j.FilePath : path.join(__dirname, '..', j.FilePath);
             if (fs.existsSync(absPath)) {
-                attachments.push({
-                    filename: j.OriginalName,
-                    path: absPath
-                });
+                attachments.push({ filename: j.OriginalName, path: absPath });
             }
         });
 
-        // 5. Send Email
-        const subject = `Facture ${data.invoice.NumeroFacture} - ${data.structure?.NomSociete || 'Soft Transit'}`;
-        const html = `
-            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                <h2 style="color: #1e3a8a;">Bonjour,</h2>
-                <p>Veuillez trouver ci-joint votre facture <strong>${data.invoice.NumeroFacture}</strong> pour le dossier <strong>${data.invoice.CodeDossier}</strong>.</p>
-                <p>Nous avons également joint les justificatifs correspondants.</p>
-                <br/>
-                <p>Cordialement,</p>
-                <p><strong>L'équipe ${data.structure?.NomSociete || 'Soft Transit'}</strong></p>
-            </div>
-        `;
+        // 5. Attach selected dossier documents (from R2 or disk)
+        if (documentIds.length > 0) {
+            const placeholders = documentIds.map(() => '?').join(',');
+            const [docs] = await pool.query(
+                `SELECT IDDocuments, LibelleDocument, CheminDocument FROM documents WHERE IDDocuments IN (${placeholders})`,
+                documentIds
+            );
+            for (const doc of docs) {
+                try {
+                    let encryptedBuffer;
+                    const key = doc.CheminDocument;
+                    if (key.startsWith('documents/')) {
+                        encryptedBuffer = await downloadFromR2(key);
+                    } else {
+                        const legacyPaths = [
+                            path.join('uploads', 'others', key),
+                            path.join('uploads', 'dossiers', key),
+                            path.join('uploads', key),
+                        ];
+                        const legacyPath = legacyPaths.find(p => fs.existsSync(p));
+                        if (!legacyPath) continue;
+                        encryptedBuffer = fs.readFileSync(legacyPath);
+                    }
+                    const decryptedBuffer = decrypt(encryptedBuffer);
+                    const filename = (doc.LibelleDocument || 'document') + path.extname(key);
+                    attachments.push({ filename, content: decryptedBuffer });
+                } catch (e) {
+                    console.warn(`Impossible d'attacher le document ${doc.IDDocuments}:`, e.message);
+                }
+            }
+        }
 
-        await emailService.sendEmail({
+        // 6. Send email
+        const societeName = data.structure?.NomSociete || 'Soft Transit';
+        const subject = `Facture ${data.invoice.NumeroFacture} — ${societeName}`;
+        const bodyHtml = `
+            <div style="font-family:Arial,sans-serif;line-height:1.6;color:#333;max-width:600px">
+                <div style="background:linear-gradient(135deg,#1e3a8a,#1e40af);padding:24px 32px;border-radius:12px 12px 0 0">
+                    <h2 style="color:white;margin:0;font-size:20px">${societeName}</h2>
+                </div>
+                <div style="background:#f8fafc;padding:32px;border:1px solid #e2e8f0;border-radius:0 0 12px 12px">
+                    <p style="font-size:15px">Bonjour,</p>
+                    <p>Veuillez trouver ci-joint la facture <strong>${data.invoice.NumeroFacture}</strong> relative au dossier <strong>${data.invoice.CodeDossier || ''}</strong>.</p>
+                    ${customMessage ? `<p style="background:#fff;border-left:3px solid #1e40af;padding:12px 16px;border-radius:4px">${customMessage}</p>` : ''}
+                    ${documentIds.length > 0 ? `<p>Les documents associés au dossier sont également joints à cet e-mail.</p>` : ''}
+                    <p style="margin-top:24px">Cordialement,<br/><strong>L'équipe ${societeName}</strong></p>
+                </div>
+            </div>`;
+
+        await transporter.sendMail({
+            from: `"${fromAddress.LibelleMail || societeName}" <${fromAddress.AdresseMail}>`,
             to: clientEmail,
             subject,
-            html,
+            html: bodyHtml,
             attachments
         });
 
-        // 6. Update dateenvoye
+        // 7. Mark as sent
         await pool.query('UPDATE factures SET dateenvoye = NOW() WHERE IDFactures = ?', [invoiceId]);
 
-        res.json({ message: 'E-mail envoyé avec succès à ' + clientEmail });
+        res.json({ message: `E-mail envoyé avec succès à ${clientEmail}` });
 
     } catch (error) {
         console.error('Error sending invoice email:', error);
-        res.status(500).json({ error: 'Erreur lors de l\'envoi de l\'e-mail : ' + error.message });
+        res.status(500).json({ error: "Erreur lors de l'envoi : " + error.message });
     }
 });
 
