@@ -143,9 +143,15 @@ export default function DashboardMenu() {
                                         style={{
                                             display: 'flex', flexDirection: 'column', gap: '12px',
                                             padding: '1.25rem',
+                                            paddingLeft: item.multi ? '1rem' : '1.25rem',
                                             background: noAccess ? '#f8fafc' : isHov ? item.grad : 'white',
                                             borderRadius: '16px',
                                             border: noAccess ? '1px solid #e2e8f0' : isHov ? `1px solid ${item.color}` : '1px solid #e2e8f0',
+                                            borderLeft: item.multi && !isHov
+                                                ? `4px solid ${item.color}`
+                                                : item.multi && isHov
+                                                    ? `4px solid rgba(255,255,255,0.55)`
+                                                    : noAccess ? '1px solid #e2e8f0' : '1px solid #e2e8f0',
                                             textDecoration: 'none',
                                             cursor: isDisabled ? 'not-allowed' : 'pointer',
                                             opacity: noAccess ? 0.45 : isDisabled ? 0.5 : 1,
@@ -155,7 +161,9 @@ export default function DashboardMenu() {
                                             transform: isHov ? 'translateY(-5px) scale(1.02)' : 'translateY(0) scale(1)',
                                             boxShadow: isHov
                                                 ? `0 16px 40px ${item.color}50, 0 4px 12px ${item.color}30`
-                                                : '0 1px 4px rgba(0,0,0,0.06)',
+                                                : item.multi
+                                                    ? `0 2px 8px ${item.color}20, 0 1px 4px rgba(0,0,0,0.06)`
+                                                    : '0 1px 4px rgba(0,0,0,0.06)',
                                             filter: noAccess ? 'grayscale(60%)' : 'none',
                                         }}
                                     >
