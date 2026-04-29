@@ -27,7 +27,7 @@ import {
     Edit, // Added
     AlertCircle // Added
 } from 'lucide-react';
-import { facturesAPI, rubriquesAPI, devisesAPI, dossiersAPI, clientsAPI, facturesRecuesAPI } from '../../services/api';
+import { facturesAPI, rubriquesAPI, devisesAPI, dossiersAPI, clientsAPI, facturesRecuesAPI, comptesMailsAPI, documentsAPI } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
 const FacturationManager = ({ dossierId }) => {
@@ -56,6 +56,12 @@ const FacturationManager = ({ dossierId }) => {
     const [emailLoading, setEmailLoading] = useState(false);
     const [isEditingEmail, setIsEditingEmail] = useState(false);
     const [editedEmail, setEditedEmail] = useState('');
+    // --- Mail accounts + dossier documents ---
+    const [comptesMails, setComptesMails] = useState([]);
+    const [selectedCompteMailId, setSelectedCompteMailId] = useState('');
+    const [dossierDocs, setDossierDocs] = useState([]);
+    const [selectedDocIds, setSelectedDocIds] = useState([]);
+    const [emailMessage, setEmailMessage] = useState('');
 
     const fetchData = async () => {
         try {
@@ -372,8 +378,24 @@ const FacturationManager = ({ dossierId }) => {
         setSelectedFacture(facture);
         setEditedEmail(facture.EmailClient || '');
         setIsEditingEmail(false);
+        setSelectedDocIds([]);
+        setEmailMessage('');
+        setSelectedCompteMailId('');
         setShowEmailModal(true);
         fetchJustificatifs(facture.IDFactures);
+        // Load mail accounts + dossier documents in parallel
+        try {
+            const [mailsRes, docsRes] = await Promise.all([
+                comptesMailsAPI.getAll(),
+                dossierId ? documentsAPI.getByDossier(dossierId) : Promise.resolve({ data: [] })
+            ]);
+            const mails = Array.isArray(mailsRes.data) ? mailsRes.data : [];
+            setComptesMails(mails);
+            if (mails.length > 0) setSelectedCompteMailId(String(mails[0].IDComptesMails));
+            setDossierDocs(Array.isArray(docsRes.data) ? docsRes.data : []);
+        } catch (e) {
+            console.warn('Erreur chargement comptes mails / documents', e);
+        }
     };
 
     const handleSaveEmail = async () => {
@@ -449,10 +471,15 @@ const FacturationManager = ({ dossierId }) => {
         if (!selectedFacture) return;
         try {
             setEmailLoading(true);
-            const res = await facturesAPI.sendEmail(selectedFacture.IDFactures);
+            const res = await facturesAPI.sendEmail(selectedFacture.IDFactures, {
+                compteMailId: selectedCompteMailId || undefined,
+                emailDestinataire: editedEmail,
+                documentIds: selectedDocIds,
+                message: emailMessage.trim() || undefined
+            });
             alert(res.data.message);
             setShowEmailModal(false);
-            fetchData(); // Refresh to show dateenvoye if needed
+            fetchData();
         } catch (err) {
             console.error('Email error:', err);
             alert('Erreur lors de l\'envoi : ' + (err.response?.data?.error || err.message));
@@ -993,60 +1020,104 @@ const FacturationManager = ({ dossierId }) => {
                             </button>
                         </div>
                         <div className="fm-modal-body">
-                            <div style={{ marginBottom: '1.5rem' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                    <label className="fm-section-label" style={{ margin: 0 }}>Destinataire</label>
-                                    {!isEditingEmail && (
-                                        <button
-                                            onClick={() => setIsEditingEmail(true)}
-                                            style={{ background: 'none', border: 'none', color: '#6366f1', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}
-                                        >
-                                            <Edit2 size={12} /> Modifier
-                                        </button>
-                                    )}
-                                </div>
 
-                                {isEditingEmail ? (
-                                    <div style={{ display: 'flex', gap: '8px' }}>
-                                        <input
-                                            type="email"
-                                            value={editedEmail}
-                                            onChange={e => setEditedEmail(e.target.value)}
-                                            style={{ flex: 1, padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #6366f1', fontSize: '13px', outline: 'none' }}
-                                            placeholder="nom@exemple.com"
-                                            autoFocus
-                                        />
-                                        <button
-                                            onClick={handleSaveEmail}
-                                            style={{ padding: '0.5rem', background: '#10b981', color: 'white', borderRadius: '0.5rem', border: 'none', cursor: 'pointer' }}
-                                            title="Enregistrer"
-                                        >
-                                            <Check size={16} />
-                                        </button>
-                                        <button
-                                            onClick={() => { setIsEditingEmail(false); setEditedEmail(selectedFacture.EmailClient || ''); }}
-                                            style={{ padding: '0.5rem', background: '#f1f5f9', color: '#64748b', borderRadius: '0.5rem', border: 'none', cursor: 'pointer' }}
-                                            title="Annuler"
-                                        >
-                                            <X size={16} />
-                                        </button>
+                            {/* ── Compte mail expéditeur ── */}
+                            <div style={{ marginBottom: '1.25rem' }}>
+                                <label className="fm-section-label">Compte expéditeur</label>
+                                {comptesMails.length === 0 ? (
+                                    <div style={{ padding: '0.75rem', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '0.625rem', fontSize: '12px', color: '#c2410c', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                        <Info size={14}/> Aucun compte mail configuré — <a href="/settings/comptes-mails" style={{ color: '#c2410c', fontWeight: 700 }}>Configurer</a>
                                     </div>
                                 ) : (
-                                    <div style={{ padding: '0.75rem', background: '#f8fafc', borderRadius: '0.75rem', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <Mail size={16} style={{ color: '#94a3b8' }} />
-                                        <span style={{ fontSize: '13px', color: '#1e293b', fontWeight: 600 }}>
-                                            {selectedFacture.EmailClient || 'Aucun email configuré'}
-                                        </span>
-                                    </div>
+                                    <select
+                                        value={selectedCompteMailId}
+                                        onChange={e => setSelectedCompteMailId(e.target.value)}
+                                        disabled={emailLoading}
+                                        style={{ width: '100%', padding: '0.6rem 0.9rem', border: '1px solid #c7d2fe', borderRadius: '0.625rem', fontSize: '13px', background: '#f8fafc', outline: 'none' }}
+                                    >
+                                        {comptesMails.map(c => (
+                                            <option key={c.IDComptesMails} value={c.IDComptesMails}>
+                                                {c.LibelleMail ? `${c.LibelleMail} <${c.AdresseMail}>` : c.AdresseMail}
+                                            </option>
+                                        ))}
+                                    </select>
                                 )}
+                            </div>
 
-                                {!selectedFacture.EmailClient && !isEditingEmail && (
-                                    <div style={{ marginTop: '0.5rem', padding: '0.75rem', background: '#fff1f2', color: '#be123c', borderRadius: '0.5rem', fontSize: '12px', display: 'flex', gap: '8px' }}>
-                                        <Info size={16} /> <span>Veuillez configurer l'email pour pouvoir envoyer cette facture.</span>
+                            {/* ── Destinataire ── */}
+                            <div style={{ marginBottom: '1.25rem' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                    <label className="fm-section-label" style={{ margin: 0 }}>Destinataire</label>
+                                    <button onClick={() => setIsEditingEmail(true)} style={{ background: 'none', border: 'none', color: '#6366f1', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                                        <Edit2 size={12}/> Modifier
+                                    </button>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <input
+                                        type="email"
+                                        value={editedEmail}
+                                        onChange={e => setEditedEmail(e.target.value)}
+                                        style={{ flex: 1, padding: '0.6rem 0.9rem', borderRadius: '0.625rem', border: '1px solid #c7d2fe', fontSize: '13px', outline: 'none' }}
+                                        placeholder="email@societe.com"
+                                    />
+                                </div>
+                                {!editedEmail && (
+                                    <div style={{ marginTop: '0.4rem', padding: '0.625rem', background: '#fff1f2', color: '#be123c', borderRadius: '0.5rem', fontSize: '11px', display: 'flex', gap: '6px' }}>
+                                        <Info size={13}/> Veuillez saisir l'adresse e-mail du destinataire.
                                     </div>
                                 )}
                             </div>
 
+                            {/* ── Message personnalisé ── */}
+                            <div style={{ marginBottom: '1.25rem' }}>
+                                <label className="fm-section-label">Message (optionnel)</label>
+                                <textarea
+                                    value={emailMessage}
+                                    onChange={e => setEmailMessage(e.target.value)}
+                                    disabled={emailLoading}
+                                    rows={3}
+                                    placeholder="Ajoutez un message personnalisé à inclure dans l'e-mail…"
+                                    style={{ width: '100%', padding: '0.6rem 0.9rem', border: '1px solid #e2e8f0', borderRadius: '0.625rem', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                                />
+                            </div>
+
+                            {/* ── Documents du dossier ── */}
+                            {dossierDocs.length > 0 && (
+                                <div style={{ marginBottom: '1.25rem' }}>
+                                    <label className="fm-section-label">Documents du dossier à joindre</label>
+                                    <div style={{ border: '1px solid #e2e8f0', borderRadius: '0.75rem', overflow: 'hidden' }}>
+                                        {dossierDocs.map((doc, i) => (
+                                            <label key={doc.id} style={{
+                                                display: 'flex', alignItems: 'center', gap: '10px',
+                                                padding: '0.625rem 1rem',
+                                                background: selectedDocIds.includes(doc.id) ? '#f5f3ff' : (i % 2 === 0 ? '#fafafa' : 'white'),
+                                                borderBottom: i < dossierDocs.length - 1 ? '1px solid #f1f5f9' : 'none',
+                                                cursor: 'pointer', transition: 'background 0.15s'
+                                            }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedDocIds.includes(doc.id)}
+                                                    onChange={e => setSelectedDocIds(prev =>
+                                                        e.target.checked ? [...prev, doc.id] : prev.filter(id => id !== doc.id)
+                                                    )}
+                                                    disabled={emailLoading}
+                                                    style={{ accentColor: '#6366f1', width: 15, height: 15 }}
+                                                />
+                                                <FileText size={13} style={{ color: selectedDocIds.includes(doc.id) ? '#6366f1' : '#94a3b8', flexShrink: 0 }}/>
+                                                <span style={{ fontSize: '13px', color: '#334155', flex: 1 }}>{doc.title}</span>
+                                                {doc.typeLabel && <span style={{ fontSize: '11px', color: '#94a3b8', background: '#f1f5f9', borderRadius: '4px', padding: '1px 6px' }}>{doc.typeLabel}</span>}
+                                            </label>
+                                        ))}
+                                    </div>
+                                    {selectedDocIds.length > 0 && (
+                                        <div style={{ marginTop: '0.4rem', fontSize: '11px', color: '#6366f1', fontWeight: 600 }}>
+                                            {selectedDocIds.length} document(s) sélectionné(s)
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* ── Justificatifs ── */}
                             <label className="fm-section-label">Ajouter des justificatifs (PDF/Images)</label>
                             <div className="fm-upload-area">
                                 {uploading ? (
@@ -1062,7 +1133,7 @@ const FacturationManager = ({ dossierId }) => {
 
                             <div className="fm-justificatifs-list">
                                 <div style={{ padding: '0.75rem 1rem', background: '#f1f5f9', fontSize: '11px', fontWeight: 700, color: '#475569', borderBottom: '1px solid #e2e8f0' }}>
-                                    FICHIERS JOINTS ({justificatifs.length + 1})
+                                    FICHIERS JOINTS ({justificatifs.length + selectedDocIds.length + 1})
                                 </div>
                                 <div className="fm-justificatif-item" style={{ background: '#f5f3ff', borderLeft: '3px solid #6366f1' }}>
                                     <div className="fm-justificatif-name">
@@ -1081,7 +1152,7 @@ const FacturationManager = ({ dossierId }) => {
                                         </button>
                                     </div>
                                 ))}
-                                {justificatifs.length === 0 && (
+                                {justificatifs.length === 0 && selectedDocIds.length === 0 && (
                                     <div style={{ padding: '1rem', textAlign: 'center', fontSize: '11px', color: '#94a3b8' }}>Aucun justificatif supplémentaire</div>
                                 )}
                             </div>
