@@ -102,6 +102,7 @@ export const usersAPI = {
 export const dossiersAPI = {
     getAll: () => api.get('/dossiers'),
     getOne: (id) => api.get(`/dossiers/${id}`),
+    getByClient: (clientId) => api.get(`/dossiers/client/${clientId}`),
     create: (data) => api.post('/dossiers', data),
     update: (id, data) => api.put(`/dossiers/${id}`, data),
     delete: (id) => api.delete(`/dossiers/${id}`)
