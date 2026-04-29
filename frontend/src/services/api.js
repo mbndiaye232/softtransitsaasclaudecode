@@ -351,6 +351,7 @@ export const devisClientAPI = {
 export const documentsAPI = {
     getByDossier: (dossierId) => api.get(`/documents/dossier/${dossierId}`),
     create: (data) => api.post('/documents', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+    view: (id) => api.get(`/documents/${id}/view`, { responseType: 'blob' }),
     viewUrl: (id) => `${API_URL}/documents/${id}/view`,
     extractUrl: (dossierId) => api.get(`/documents/dossier/${dossierId}/extract`),
     delete: (id) => api.delete(`/documents/${id}`)

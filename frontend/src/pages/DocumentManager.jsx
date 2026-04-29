@@ -132,10 +132,15 @@ export default function DocumentManager() {
         } catch { toast('error', 'Impossible de supprimer') }
     }
 
-    const handleOpen = (id) => {
-        const url   = documentsAPI.viewUrl(id)
-        const token = localStorage.getItem('token')
-        window.open(`${url}?token=${token}`, '_blank')
+    const handleOpen = async (id) => {
+        try {
+            const res = await documentsAPI.view(id)
+            const blob = new Blob([res.data], { type: res.headers['content-type'] || 'application/octet-stream' })
+            const url = window.URL.createObjectURL(blob)
+            window.open(url, '_blank')
+        } catch (e) {
+            toast('error', 'Impossible d\'ouvrir le document')
+        }
     }
 
     const handleExtract = () => {
