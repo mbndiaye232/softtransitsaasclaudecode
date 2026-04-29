@@ -11,6 +11,7 @@ import DeclarationManager from '../components/dossiers/DeclarationManager';
 import MiseEnLivraisonManager from '../components/dossiers/MiseEnLivraisonManager';
 import BordereauLivraisonManager from '../components/dossiers/BordereauLivraisonManager';
 import FacturationManager from '../components/dossiers/FacturationManager';
+import EnvoiFacturesManager from '../components/dossiers/EnvoiFacturesManager';
 import DevisManager from '../components/dossiers/DevisManager';
 import FacturesTiersManager from '../components/dossiers/FacturesTiersManager';
 import DossierReglementsManager from '../components/dossiers/DossierReglementsManager';
@@ -83,6 +84,7 @@ const DossierEdit = () => {
         { id: 'devis',              label: 'Devis',          icon: <FileCheck2 size={13} /> },
         { id: 'factures_tiers',     label: 'Factures Tiers', icon: <Building2 size={13} /> },
         { id: 'facturation',        label: 'Facturation',    icon: <CreditCard size={13} /> },
+        { id: 'envoi_factures',     label: 'Envoi Factures', icon: <Mail size={13} /> },
         { id: 'reglements',         label: 'Règlements',     icon: <CheckCircle size={13} /> },
     ];
 
@@ -466,6 +468,7 @@ const DossierEdit = () => {
                         {activeTab === 'devis'               && <DevisManager dossierId={id} />}
                         {activeTab === 'factures_tiers'      && <FacturesTiersManager dossierId={id} />}
                         {activeTab === 'facturation'         && <FacturationManager dossierId={id} />}
+                        {activeTab === 'envoi_factures'      && <EnvoiFacturesManager dossierId={id} />}
                         {activeTab === 'reglements'          && <DossierReglementsManager dossierId={id} />}
                     </div>
                 )}
