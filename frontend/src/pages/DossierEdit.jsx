@@ -404,9 +404,15 @@ const DossierEdit = () => {
                                             </div>
                                             <button
                                                 type="button"
-                                                onClick={() => {
-                                                    const token = localStorage.getItem('token');
-                                                    window.open(`${documentsAPI.viewUrl(doc.id)}?token=${token}`, '_blank');
+                                                onClick={async () => {
+                                                    try {
+                                                        const res = await documentsAPI.view(doc.id);
+                                                        const blob = new Blob([res.data], { type: res.headers['content-type'] || 'application/octet-stream' });
+                                                        const url = window.URL.createObjectURL(blob);
+                                                        window.open(url, '_blank');
+                                                    } catch (e) {
+                                                        alert('Impossible d\'ouvrir le document');
+                                                    }
                                                 }}
                                                 style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:10, border:'1px solid #e5e7eb', background:'white', color:'#374151', fontWeight:600, fontSize:13, cursor:'pointer' }}
                                             >
