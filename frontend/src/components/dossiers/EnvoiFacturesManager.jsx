@@ -15,6 +15,7 @@ const C = {
 
 const fmt = (n, dec = 0) => n == null ? '—' : Number(n).toLocaleString('fr-FR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
 const fmtDate = d => d ? new Date(d).toLocaleDateString('fr-FR') : '—';
+const fmtDateTime = d => d ? new Date(d).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
 
 function Badge({ color, bg, children }) {
     return (
@@ -31,7 +32,7 @@ export default function EnvoiFacturesManager({ dossierId }) {
     const [loading, setLoading]           = useState(true);
     const [expanded, setExpanded]         = useState(null);   // IDFactures of open panel
     const [sending, setSending]           = useState(null);   // IDFactures being sent
-    const [sent, setSent]                 = useState({});     // { id: true }
+    const [sent, setSent]                 = useState({});     // { id: { at: Date } }
     const [error, setError]               = useState({});
     const [forms, setForms]               = useState({});     // { id: { compteMailId, email, objet, message, docIds } }
 
@@ -117,11 +118,11 @@ Dans l'attente de votre règlement, nous vous prions d'agréer, Madame, Monsieur
                 message:         form.message,
                 objet:           form.objet,
             });
-            setSent(p => ({ ...p, [facture.IDFactures]: true }));
+            const sentAt = new Date();
+            setSent(p => ({ ...p, [facture.IDFactures]: { at: sentAt } }));
             setExpanded(null);
-            // Update local state
             setInvoices(p => p.map(f =>
-                f.IDFactures === facture.IDFactures ? { ...f, dateenvoye: new Date().toISOString() } : f
+                f.IDFactures === facture.IDFactures ? { ...f, dateenvoye: sentAt.toISOString() } : f
             ));
         } catch (e) {
             setError(p => ({ ...p, [facture.IDFactures]: e?.response?.data?.error || e.message }));
@@ -192,7 +193,9 @@ Dans l'attente de votre règlement, nous vous prions d'agréer, Madame, Monsieur
             {invoices.map(f => {
                 const form    = forms[f.IDFactures] || {};
                 const isOpen  = expanded === f.IDFactures;
-                const isSent  = sent[f.IDFactures] || !!f.dateenvoye;
+                const sentInfo = sent[f.IDFactures];
+                const isSent  = !!sentInfo || !!f.dateenvoye;
+                const sentAt  = sentInfo?.at ? fmtDateTime(sentInfo.at) : (f.dateenvoye ? fmtDateTime(f.dateenvoye) : null);
                 const isLoading = sending === f.IDFactures;
                 const err     = error[f.IDFactures];
                 const prefix  = (f.NumeroFacture || '').substring(0, 2);
@@ -243,8 +246,11 @@ Dans l'attente de votre règlement, nous vous prions d'agréer, Madame, Monsieur
 
                             {/* Status */}
                             {isSent ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#16a34a', fontWeight: 700, fontSize: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '4px 12px', whiteSpace: 'nowrap' }}>
-                                    <CheckCircle size={13} /> Envoyée
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '10px', padding: '6px 14px', minWidth: 160 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#15803d', fontWeight: 800, fontSize: '13px' }}>
+                                        <CheckCircle size={15} fill="#15803d" color="white" /> Facture envoyée
+                                    </div>
+                                    {sentAt && <div style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>le {sentAt}</div>}
                                 </div>
                             ) : (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#0e7490', fontWeight: 700, fontSize: '12px', background: C.light, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '4px 12px', whiteSpace: 'nowrap' }}>
@@ -279,7 +285,7 @@ Dans l'attente de votre règlement, nous vous prions d'agréer, Madame, Monsieur
                                             >
                                                 {comptesMails.map(c => (
                                                     <option key={c.IDComptesMails} value={c.IDComptesMails}>
-                                                        {c.LibelleMail ? `${c.LibelleMail} — ${c.AdresseMail}` : c.AdresseMail}
+                                                        {[c.LibelleMail, c.AdresseMail].filter(Boolean).join(' — ')}
                                                     </option>
                                                 ))}
                                             </select>

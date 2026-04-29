@@ -59,7 +59,7 @@ class InvoicePDFGenerator {
                  LEFT JOIN dossiers d ON f.IDDossiers = d.IDDossiers
                  LEFT JOIN clients c ON d.IDCLIENTS = c.IDCLIENTS
                  LEFT JOIN billoflading bl ON d.IDDossiers = bl.idbl
-                 LEFT JOIN ordresTransit ot ON d.IDDossiers = ot.IDDossiers
+                 LEFT JOIN ordrestransit ot ON d.IDDossiers = ot.IDDossiers
                  LEFT JOIN agents a ON f.IDAgents = a.IDAgents
                  WHERE f.IDFactures = ?`,
                 [invoiceId]
