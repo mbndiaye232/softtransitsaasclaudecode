@@ -52,12 +52,26 @@ router.post('/', checkPermission('DOSSIERS', 'can_create'), uploadMemory.single(
         // Encrypt in memory
         const encryptedBuffer = encrypt(req.file.buffer);
 
-        // Generate unique key for R2
-        const ext = path.extname(req.file.originalname);
-        const r2Key = `documents/${dossierId}/${Date.now()}_${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+        const r2Ready = process.env.CLOUDFLARE_R2_ACCOUNT_ID &&
+                        process.env.CLOUDFLARE_R2_ACCESS_KEY_ID &&
+                        process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY;
 
-        // Upload to Cloudflare R2
-        await uploadToR2(r2Key, encryptedBuffer, req.file.mimetype);
+        let storedKey;
+
+        if (r2Ready) {
+            // Store in Cloudflare R2
+            const r2Key = `documents/${dossierId}/${Date.now()}_${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+            await uploadToR2(r2Key, encryptedBuffer, req.file.mimetype);
+            storedKey = r2Key;
+        } else {
+            // Fallback: save to local disk (Railway ephemeral — configure R2 for persistence)
+            const uploadDir = path.join('uploads', 'dossiers');
+            if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+            const filename = `${Date.now()}_${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+            fs.writeFileSync(path.join(uploadDir, filename), encryptedBuffer);
+            storedKey = filename;
+            console.warn('R2 not configured — using local disk (ephemeral). Set CLOUDFLARE_R2_* env vars.');
+        }
 
         const [result] = await pool.query(`
             INSERT INTO documents (
@@ -65,7 +79,7 @@ router.post('/', checkPermission('DOSSIERS', 'can_create'), uploadMemory.single(
                 NumeroDocument, IDTypesDocuments, DatePublication, Observations, IdAgent
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
-            dossierId, title, description, r2Key,
+            dossierId, title, description, storedKey,
             number, typeId || null, date || null, observations || null, req.user.id
         ]);
 
