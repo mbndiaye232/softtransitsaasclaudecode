@@ -331,8 +331,9 @@ export default function NoteDeDetail() {
             }
             await handleCalculateTaxes(articleId);
         } catch(e) {
-            console.error('handleLancer error:', e?.response?.data || e?.message || e);
-            showMessage(`Erreur: ${e?.response?.data?.message || e?.message || 'Lancement du calcul'}`, 'error');
+            const detail = e?.response?.data?.error || e?.response?.data?.message || e?.message || e;
+            console.error('handleLancer error:', detail, e?.response?.status, e?.response?.data);
+            showMessage(`Erreur calcul: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`, 'error');
         }
     };
 

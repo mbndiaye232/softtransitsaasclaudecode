@@ -636,8 +636,8 @@ router.post('/articles/:id/calculate-taxes', checkPermission('NOTES', 'can_edit'
 
     } catch (error) {
         if (connection) await connection.rollback();
-        console.error(error);
-        res.status(500).json({ error: 'Server error' });
+        console.error('calculate-taxes error:', error.message, error.stack);
+        res.status(500).json({ error: error.message || 'Server error' });
     } finally {
         if (connection) connection.release();
     }
