@@ -262,7 +262,9 @@ class InvoicePDFGenerator {
     }
 
     formatCurrency(amount) {
-        return new Intl.NumberFormat('fr-FR').format(amount).replace(/\s/g, ' ') + ' FCFA';
+        //   = narrow no-break space (used by fr-FR locale),   = non-breaking space
+        return new Intl.NumberFormat('fr-FR').format(Math.round(amount))
+            .replace(/[  \s]/g, ' ') + ' FCFA';
     }
 
     numberToFrench(n) {
