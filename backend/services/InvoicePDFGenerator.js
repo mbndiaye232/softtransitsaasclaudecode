@@ -158,14 +158,16 @@ class InvoicePDFGenerator {
         doc.fillColor('white').font('Helvetica-Bold').fontSize(9);
 
         const cols = {
-            ref:     60,
-            libelle: usableWidth - 60 - 100,   // absorbe l'ancienne colonne complément
-            montant: 100,
+            ref: 60,
+            libelle: 250,
+            complement: 100,
+            montant: usableWidth - 60 - 250 - 100
         };
 
         let curX = marginX;
         doc.text('Code', curX + 5, tableTop + 6); curX += cols.ref;
         doc.text('Libellé Rubrique', curX + 5, tableTop + 6); curX += cols.libelle;
+        doc.text('Complément', curX + 5, tableTop + 6); curX += cols.complement;
         doc.text('Montant HT', curX, tableTop + 6, { width: cols.montant, align: 'right' });
 
         // Table Rows
@@ -173,16 +175,7 @@ class InvoicePDFGenerator {
         doc.fillColor('black').font('Helvetica').fontSize(9);
 
         rubriques.forEach((r, i) => {
-            // Libellé = rubrique + complément concaténé
-            const complement = (r.Complement || '').trim();
-            const libelle = complement
-                ? `${r.libelleRubrique || ''} — ${complement}`
-                : (r.libelleRubrique || '');
-
-            // Hauteur dynamique selon le texte (peut dépasser 1 ligne)
-            const libelleHeight = doc.heightOfString(libelle, { width: cols.libelle - 10 });
-            const rowHeight = Math.max(20, libelleHeight + 8);
-
+            const rowHeight = 20;
             if (rowY + rowHeight > doc.page.height - 150) {
                 doc.addPage();
                 rowY = 50;
@@ -192,8 +185,9 @@ class InvoicePDFGenerator {
 
             doc.fillColor('black');
             let cx = marginX;
-            doc.text(r.CodeRubrique || '', cx + 5, rowY + 6, { width: cols.ref - 10 }); cx += cols.ref;
-            doc.text(libelle, cx + 5, rowY + 6, { width: cols.libelle - 10 }); cx += cols.libelle;
+            doc.text(r.CodeRubrique || '', cx + 5, rowY + 6); cx += cols.ref;
+            doc.text(r.libelleRubrique || '', cx + 5, rowY + 6); cx += cols.libelle;
+            doc.text(r.Complement || '', cx + 5, rowY + 6, { width: cols.complement }); cx += cols.complement;
             doc.text(this.formatCurrency(r.MontantHTFactures || 0), cx, rowY + 6, { width: cols.montant, align: 'right' });
 
             rowY += rowHeight;
