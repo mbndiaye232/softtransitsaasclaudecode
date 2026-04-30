@@ -111,9 +111,23 @@ class InvoicePDFGenerator {
         const dateStr = `${String(dateFacture.getDate()).padStart(2, '0')}/${String(dateFacture.getMonth() + 1).padStart(2, '0')}/${dateFacture.getFullYear()}`;
         doc.text(`Date: ${dateStr}`, marginX, 75, { align: 'right' });
 
+        // Échéance — stockée en DB ou calculée en fallback
+        let dateEch;
+        if (invoice.DateEcheance) {
+            dateEch = new Date(invoice.DateEcheance);
+        } else {
+            const isDouane = String(invoice.NumeroFacture || '').startsWith('FD');
+            const delai = isDouane ? 15 : 30;
+            dateEch = new Date(dateFacture);
+            dateEch.setDate(dateEch.getDate() + delai);
+        }
+        const dateEchStr = `${String(dateEch.getDate()).padStart(2, '0')}/${String(dateEch.getMonth() + 1).padStart(2, '0')}/${dateEch.getFullYear()}`;
+        doc.fontSize(9).font('Helvetica-Bold').fillColor('#b91c1c');
+        doc.text(`Échéance : ${dateEchStr}`, marginX, 92, { align: 'right' });
+
         // Company Details (Left)
-        doc.moveDown(2);
-        const startY = 110;
+        doc.fillColor('black');
+        const startY = 115;
         doc.fontSize(10).font('Helvetica-Bold').text(structure?.NomSociete || '', marginX, startY);
         doc.font('Helvetica').fontSize(8).fillColor('#4b5563');
         doc.text(structure?.adrSociete || '', marginX, startY + 15, { width: 250 });

@@ -46,7 +46,7 @@ export default function ClientForm() {
         IDStatuts: '',
         EncoursAutorise: '0',
         DelaiReglement: '30',
-        DelaiReglementDouane: '10',
+        DelaiReglementDouane: '15',
         TauxRemise: '0.00',
         AssuranceCredit: '0',
         ExonereTVA: false,
@@ -97,8 +97,8 @@ export default function ClientForm() {
                 faxClient: data.faxClient || '',
                 IDStatuts: data.IDStatuts || '',
                 EncoursAutorise: data.EncoursAutorise || '0',
-                DelaiReglement: data.DelaiReglement || '30',
-                DelaiReglementDouane: data.DelaiReglementDouane || '10',
+                DelaiReglement: data.DelaiReglement != null ? String(data.DelaiReglement) : '30',
+                DelaiReglementDouane: data.DelaiReglementDouane != null ? String(data.DelaiReglementDouane) : '15',
                 TauxRemise: data.TauxRemise || '0.00',
                 AssuranceCredit: data.AssuranceCredit || '0',
                 ExonereTVA: !!data.ExonereTVA,
@@ -337,12 +337,12 @@ export default function ClientForm() {
                                     <input type="number" name="EncoursAutorise" className="premium-input" value={formData.EncoursAutorise} onChange={handleChange} />
                                 </div>
                                 <div className="input-group col-4">
-                                    <label className="input-label">Délai Règlement (Jours)</label>
-                                    <input type="number" name="DelaiReglement" className="premium-input" value={formData.DelaiReglement} onChange={handleChange} />
+                                    <label className="input-label">Délai Règlement (Jours) <span style={{color:'#ef4444'}}>*</span></label>
+                                    <input type="number" name="DelaiReglement" className="premium-input" value={formData.DelaiReglement} onChange={handleChange} required min="0" placeholder="30" />
                                 </div>
                                 <div className="input-group col-4">
-                                    <label className="input-label">Délai Douane (Jours)</label>
-                                    <input type="number" name="DelaiReglementDouane" className="premium-input" value={formData.DelaiReglementDouane} onChange={handleChange} />
+                                    <label className="input-label">Délai Douane (Jours) <span style={{color:'#ef4444'}}>*</span></label>
+                                    <input type="number" name="DelaiReglementDouane" className="premium-input" value={formData.DelaiReglementDouane} onChange={handleChange} required min="0" placeholder="15" />
                                 </div>
                                 <div className="input-group col-4">
                                     <label className="input-label">Taux Remise (%)</label>
