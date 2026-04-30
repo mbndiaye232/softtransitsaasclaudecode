@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { fmt } from '../utils/format';
 import { clientsAPI, dossiersAPI, notesAPI, produitsAPI, regimesAPI, devisesAPI, paysAPI, taxesAPI } from '../services/api';
 import {
     Calculator, FileText, Search, Users, Folder, Plus, Save,
@@ -386,7 +387,8 @@ export default function NoteDeDetail() {
 
     const calculateCAF = (a) => {
         const r = (id) => { const d=devises.find(d=>d.IDDevises==id); return d?parseFloat(d.TauxChangeDeviseCFA||1):1; };
-        return (parseFloat(a.FOB||0)*r(a.IDDEVISEFOB) + parseFloat(a.Fret||0)*r(a.IDDEVISEFRET) + parseFloat(a.Assurances||0)*r(a.IDDEVISEASS)).toFixed(0);
+        const total = parseFloat(a.FOB||0)*r(a.IDDEVISEFOB) + parseFloat(a.Fret||0)*r(a.IDDEVISEFRET) + parseFloat(a.Assurances||0)*r(a.IDDEVISEASS);
+        return fmt(total, 0);
     };
 
     const saveSingleArticle = async (a, idx) => {
@@ -743,7 +745,7 @@ export default function NoteDeDetail() {
                                                 </td>
                                                 <td style={{padding:'6px 7px',color:'#374151',fontSize:10,maxWidth:90,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={tax.LibelleTaxe}>{tax.LibelleTaxe}</td>
                                                 <td style={{padding:'6px 7px',textAlign:'right',color:'#9ca3af',fontSize:10}}>{tax.Taux?tax.Taux+'%':'-'}</td>
-                                                <td style={{padding:'6px 7px',textAlign:'right',fontWeight:800,fontSize:10,color:tax.Montant>0?COLORS.taxes.accent:'#d1d5db'}}>{tax.Montant?tax.Montant.toLocaleString():'-'}</td>
+                                                <td style={{padding:'6px 7px',textAlign:'right',fontWeight:800,fontSize:10,color:tax.Montant>0?COLORS.taxes.accent:'#d1d5db'}}>{tax.Montant?fmt(tax.Montant):'-'}</td>
                                             </tr>
                                         );
                                     })}
@@ -754,7 +756,7 @@ export default function NoteDeDetail() {
                         {totalTaxes>0 && (
                             <div style={{padding:'10px 14px',background:`linear-gradient(135deg,${COLORS.taxes.accent},#b91c1c)`,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                                 <span style={{fontSize:9,fontWeight:800,color:'rgba(255,255,255,.6)',textTransform:'uppercase',letterSpacing:'.05em'}}>Cumul liquidé</span>
-                                <span style={{fontSize:15,fontWeight:900,color:'white'}}>{totalTaxes.toLocaleString()} <small style={{fontSize:10,opacity:.7}}>XOF</small></span>
+                                <span style={{fontSize:15,fontWeight:900,color:'white'}}>{fmt(totalTaxes)} <small style={{fontSize:10,opacity:.7}}>XOF</small></span>
                             </div>
                         )}
                     </div>
