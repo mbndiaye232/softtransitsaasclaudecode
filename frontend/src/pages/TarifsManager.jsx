@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { produitsAPI, taxesAPI, tauxAPI, tarifsAPI } from '../services/api';
+import { produitsAPI, taxesAPI, tauxAPI, tarifsAPI, taxesComplementsAPI } from '../services/api';
 import {
     Plus, X, ArrowLeft, AlertCircle, CheckCircle, Package,
     Percent, Tag, Hash, Link2, Trash2, Search, ChevronLeft, ChevronRight,
-    RefreshCw, Layers, Pencil
+    RefreshCw, Layers, Pencil, GitMerge
 } from 'lucide-react';
 
 const INITIAL_MODAL = { type: null, data: {} };
@@ -198,6 +198,10 @@ export default function TarifsManager() {
     const [taxeFilter, setTaxeFilter] = useState('');
     const [tauxFilter, setTauxFilter] = useState('');
     const [tarifFilter, setTarifFilter] = useState('');
+
+    const [selectedTaxe, setSelectedTaxe] = useState(null);
+    const [complementCodes, setComplementCodes] = useState([]);
+    const [savingComplements, setSavingComplements] = useState(false);
 
     const showToast = useCallback((msg, type = 'success') => {
         setToast({ msg, type });
@@ -392,6 +396,30 @@ export default function TarifsManager() {
         if (formBulk.mode === 'category' && formBulk.ntsPrefix) return `Produits commençant par ${formBulk.ntsPrefix}`;
         if (formBulk.mode === 'individual') return formBulk.selectedNTS.length;
         return 0;
+    };
+
+    const handleSelectTaxe = async (taxe) => {
+        setSelectedTaxe(taxe);
+        try {
+            const res = await taxesComplementsAPI.getByTaxe(taxe.CodeTaxe);
+            setComplementCodes((res.data || []).map(c => c.CodeTaxeComplement));
+        } catch { setComplementCodes([]); }
+    };
+
+    const toggleComplement = (code) => {
+        setComplementCodes(prev =>
+            prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code]
+        );
+    };
+
+    const handleSaveComplements = async () => {
+        if (!selectedTaxe) return;
+        setSavingComplements(true);
+        try {
+            await taxesComplementsAPI.update(selectedTaxe.CodeTaxe, complementCodes);
+            showToast(`Compléments de la taxe ${selectedTaxe.CodeTaxe} enregistrés`);
+        } catch (err) { showToast(err.response?.data?.error || 'Erreur', 'error'); }
+        finally { setSavingComplements(false); }
     };
 
     const handleDelete = async (type, id) => {
@@ -611,6 +639,96 @@ export default function TarifsManager() {
                         />
                     </BlockCard>
                 </div>
+
+                {/* ── COMPLÉMENTS TAXES ── */}
+                {isAdmin && (
+                    <div style={{ marginBottom: '1.25rem' }}>
+                        <div style={{ borderRadius: '18px', overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.1)', border: '1px solid #ddd6fe' }}>
+                            <div style={{ background: 'linear-gradient(135deg,#6d28d9,#8b5cf6)', padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{ width: '34px', height: '34px', borderRadius: '9px', background: 'rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                                    <GitMerge size={18} />
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '13px', fontWeight: 800, color: 'white', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Compléments de taxes</div>
+                                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.65)', fontWeight: 600 }}>
+                                        {selectedTaxe ? `Taxe sélectionnée : ${selectedTaxe.CodeTaxe} – ${selectedTaxe.LibelleTaxe}` : 'Cliquez sur une taxe pour gérer ses compléments'}
+                                    </div>
+                                </div>
+                            </div>
+                            <div style={{ background: 'white', padding: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                                {/* Colonne gauche : sélection de la taxe principale */}
+                                <div>
+                                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '10px' }}>
+                                        1. Sélectionner la taxe principale
+                                    </div>
+                                    <div style={{ maxHeight: '260px', overflowY: 'auto', border: '1.5px solid #e2e8f0', borderRadius: '10px' }}>
+                                        {taxes.map(t => {
+                                            const isSel = selectedTaxe?.CodeTaxe === t.CodeTaxe;
+                                            return (
+                                                <div key={t.IDTaxes} onClick={() => handleSelectTaxe(t)} style={{
+                                                    display: 'flex', alignItems: 'center', gap: '10px',
+                                                    padding: '9px 14px', cursor: 'pointer',
+                                                    borderBottom: '1px solid #f1f5f9',
+                                                    background: isSel ? '#f5f3ff' : 'transparent',
+                                                    borderLeft: isSel ? '3px solid #7c3aed' : '3px solid transparent',
+                                                    transition: 'all 0.15s',
+                                                }}>
+                                                    <span style={{ fontFamily: 'monospace', fontSize: '12px', fontWeight: 800, background: '#f5f3ff', color: '#7c3aed', padding: '2px 7px', borderRadius: '5px', minWidth: '28px', textAlign: 'center' }}>{t.CodeTaxe}</span>
+                                                    <span style={{ fontSize: '12px', color: '#334155', fontWeight: isSel ? 700 : 400 }}>{t.LibelleTaxe}</span>
+                                                    <span style={{ marginLeft: 'auto', fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>Niv.{t.Niveau}</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                                {/* Colonne droite : cases à cocher des compléments */}
+                                <div>
+                                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '10px' }}>
+                                        2. Taxes dont les montants s'ajoutent au CAF
+                                    </div>
+                                    {!selectedTaxe ? (
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px', color: '#cbd5e1', fontSize: '13px', fontWeight: 600, border: '1.5px dashed #e2e8f0', borderRadius: '10px' }}>
+                                            ← Sélectionnez d'abord une taxe
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div style={{ maxHeight: '220px', overflowY: 'auto', border: '1.5px solid #e2e8f0', borderRadius: '10px', marginBottom: '12px' }}>
+                                                {taxes.filter(t => t.CodeTaxe !== selectedTaxe.CodeTaxe).map(t => {
+                                                    const isChecked = complementCodes.includes(t.CodeTaxe);
+                                                    return (
+                                                        <label key={t.IDTaxes} style={{
+                                                            display: 'flex', alignItems: 'center', gap: '10px',
+                                                            padding: '8px 14px', cursor: 'pointer',
+                                                            borderBottom: '1px solid #f1f5f9',
+                                                            background: isChecked ? '#f0fdf4' : 'transparent',
+                                                            transition: 'background 0.15s',
+                                                        }}>
+                                                            <input type="checkbox" checked={isChecked} onChange={() => toggleComplement(t.CodeTaxe)} style={{ accentColor: '#7c3aed', width: '15px', height: '15px' }} />
+                                                            <span style={{ fontFamily: 'monospace', fontSize: '12px', fontWeight: 800, background: '#f5f3ff', color: '#7c3aed', padding: '2px 7px', borderRadius: '5px', minWidth: '28px', textAlign: 'center' }}>{t.CodeTaxe}</span>
+                                                            <span style={{ fontSize: '12px', color: '#334155' }}>{t.LibelleTaxe}</span>
+                                                            <span style={{ marginLeft: 'auto', fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>Niv.{t.Niveau}</span>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>{complementCodes.length} complément(s)</span>
+                                                <button onClick={handleSaveComplements} disabled={savingComplements} style={{
+                                                    background: 'linear-gradient(135deg,#6d28d9,#8b5cf6)', color: 'white',
+                                                    border: 'none', borderRadius: '9px', padding: '9px 22px',
+                                                    fontWeight: 800, fontSize: '13px', cursor: savingComplements ? 'not-allowed' : 'pointer',
+                                                    opacity: savingComplements ? 0.7 : 1, boxShadow: '0 4px 12px rgba(109,40,217,0.3)',
+                                                }}>
+                                                    {savingComplements ? 'Enregistrement...' : '✓ Enregistrer les compléments'}
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* ── BULK UPDATE BLOCK ── */}
                 {isAdmin && (
