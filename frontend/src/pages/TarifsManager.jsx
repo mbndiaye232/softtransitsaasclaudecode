@@ -371,7 +371,7 @@ export default function TarifsManager() {
     const filteredTaxes = taxes.filter(t => !taxeFilter || t.CodeTaxe?.includes(taxeFilter) || t.LibelleTaxe?.toLowerCase().includes(taxeFilter.toLowerCase()));
     const filteredTaux = taux.filter(t => !tauxFilter || t.CodeTaux?.includes(tauxFilter) || t.Taux?.toString().includes(tauxFilter));
 
-    const isAdmin = user?.role === 'ADMIN' || user?.is_provider;
+    const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || user?.is_provider;
     const totalPages = Math.ceil(totalTarifs / 50) || 1;
 
     /* ── inline form helpers ── */
