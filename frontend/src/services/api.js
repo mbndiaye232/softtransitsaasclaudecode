@@ -169,6 +169,12 @@ export const taxesAPI = {
     delete: (id) => api.delete(`/taxes/${id}`)
 };
 
+export const taxesComplementsAPI = {
+    getByTaxe: (codeTaxe) => api.get(`/taxes-complements?codeTaxe=${codeTaxe}`),
+    getAll: () => api.get('/taxes-complements'),
+    update: (codeTaxe, complementCodes) => api.put(`/taxes-complements/${codeTaxe}`, { complementCodes })
+};
+
 export const ordresTransitAPI = {
     getAll: () => api.get('/ordres-transit'),
     getOne: (id) => api.get(`/ordres-transit/${id}`),
