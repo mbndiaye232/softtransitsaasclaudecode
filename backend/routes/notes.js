@@ -586,12 +586,9 @@ router.post('/articles/:id/calculate-taxes', checkPermission('NOTES', 'can_edit'
                     baseValue = 0;
                 }
 
-                if (complementsMap[taxCode]) {
-                    const compCodes = complementsMap[taxCode];
-                    for (const compCode of compCodes) {
-                        if (calculatedAmounts[compCode]) {
-                            baseValue += calculatedAmounts[compCode];
-                        }
+                if (tax.Niveau > 1 && complementsMap[taxCode]) {
+                    for (const compCode of complementsMap[taxCode]) {
+                        baseValue += calculatedAmounts[compCode] || 0;
                     }
                 }
 
