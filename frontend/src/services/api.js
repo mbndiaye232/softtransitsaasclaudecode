@@ -131,7 +131,10 @@ export const notesAPI = {
 export const produitsAPI = {
     getAll: (params) => api.get('/produits', { params }),
     search: (query) => api.get(`/produits/search?q=${query}`),
-    getByNTS: (nts) => api.get(`/produits/${nts}`)
+    getByNTS: (nts) => api.get(`/produits/${nts}`),
+    create: (data) => api.post('/produits', data),
+    update: (nts, data) => api.put(`/produits/${nts}`, data),
+    delete: (nts) => api.delete(`/produits/${nts}`)
 };
 
 export const regimesAPI = {
@@ -160,7 +163,10 @@ export const activitesAPI = {
 
 
 export const taxesAPI = {
-    getAll: (nts) => api.get(`/taxes${nts ? `?nts=${nts}` : ''}`)
+    getAll: (nts) => api.get(`/taxes${nts ? `?nts=${nts}` : ''}`),
+    create: (data) => api.post('/taxes', data),
+    update: (id, data) => api.put(`/taxes/${id}`, data),
+    delete: (id) => api.delete(`/taxes/${id}`)
 };
 
 export const ordresTransitAPI = {
@@ -402,6 +408,7 @@ export const tarifsAPI = {
 export const tauxAPI = {
     getAll: () => api.get('/taux'),
     create: (data) => api.post('/taux', data),
+    update: (id, data) => api.put(`/taux/${id}`, data),
     delete: (id) => api.delete(`/taux/${id}`)
 };
 

@@ -5,7 +5,7 @@ import { produitsAPI, taxesAPI, tauxAPI, tarifsAPI } from '../services/api';
 import {
     Plus, X, ArrowLeft, AlertCircle, CheckCircle, Package,
     Percent, Tag, Hash, Link2, Trash2, Search, ChevronLeft, ChevronRight,
-    RefreshCw, Layers
+    RefreshCw, Layers, Pencil
 } from 'lucide-react';
 
 const INITIAL_MODAL = { type: null, data: {} };
@@ -283,6 +283,14 @@ export default function TarifsManager() {
         setFormTarif({ NTS: '', CodeTaxe: '', CodeTaux: '' });
         setModal({ type });
     };
+
+    const openEditModal = (type, item) => {
+        if (type === 'nts') setFormNTS({ NTS: item.NTS, Libelle: item.Libelle });
+        if (type === 'taxe') setFormTaxe({ CodeTaxe: item.CodeTaxe, LibelleTaxe: item.LibelleTaxe, LibelleTaxeComplet: item.LibelleTaxeComplet || '', Base: item.Base || '', Niveau: item.Niveau || '1' });
+        if (type === 'taux') setFormTaux({ CodeTaux: item.CodeTaux, Taux: item.Taux, IDTaux: item.IDTaux });
+        setModal({ type: `edit-${type}`, data: item });
+    };
+
     const closeModal = () => setModal(INITIAL_MODAL);
 
     const handleAddNTS = async (e) => {
@@ -290,6 +298,16 @@ export default function TarifsManager() {
         try {
             await produitsAPI.create(formNTS);
             showToast(`Produit NTS "${formNTS.NTS}" ajouté`);
+            closeModal(); loadAll();
+        } catch (err) { showToast(err.response?.data?.error || 'Erreur', 'error'); }
+        finally { setSaving(false); }
+    };
+
+    const handleEditNTS = async (e) => {
+        e.preventDefault(); setSaving(true);
+        try {
+            await produitsAPI.update(formNTS.NTS, { Libelle: formNTS.Libelle });
+            showToast(`Produit "${formNTS.NTS}" mis à jour`);
             closeModal(); loadAll();
         } catch (err) { showToast(err.response?.data?.error || 'Erreur', 'error'); }
         finally { setSaving(false); }
@@ -305,11 +323,31 @@ export default function TarifsManager() {
         finally { setSaving(false); }
     };
 
+    const handleEditTaxe = async (e) => {
+        e.preventDefault(); setSaving(true);
+        try {
+            await taxesAPI.update(modal.data.IDTaxes, { LibelleTaxe: formTaxe.LibelleTaxe, LibelleTaxeComplet: formTaxe.LibelleTaxeComplet, Base: formTaxe.Base, Niveau: formTaxe.Niveau });
+            showToast(`Taxe "${formTaxe.CodeTaxe}" mise à jour`);
+            closeModal(); loadAll();
+        } catch (err) { showToast(err.response?.data?.error || 'Erreur', 'error'); }
+        finally { setSaving(false); }
+    };
+
     const handleAddTaux = async (e) => {
         e.preventDefault(); setSaving(true);
         try {
             await tauxAPI.create(formTaux);
             showToast(`Taux "${formTaux.CodeTaux}" ajouté`);
+            closeModal(); loadAll();
+        } catch (err) { showToast(err.response?.data?.error || 'Erreur', 'error'); }
+        finally { setSaving(false); }
+    };
+
+    const handleEditTaux = async (e) => {
+        e.preventDefault(); setSaving(true);
+        try {
+            await tauxAPI.update(modal.data.IDTaux, { Taux: formTaux.Taux });
+            showToast(`Taux "${formTaux.CodeTaux}" mis à jour`);
             closeModal(); loadAll();
         } catch (err) { showToast(err.response?.data?.error || 'Erreur', 'error'); }
         finally { setSaving(false); }
@@ -502,13 +540,17 @@ export default function TarifsManager() {
                         <DataTable
                             maxHeight="280px"
                             grad={C.produits.grad} color={C.produits.accent}
-                            headers={['NTS', 'Libellé', ...(isAdmin ? [''] : [])]}
+                            headers={['NTS', 'Libellé', ...(isAdmin ? ['', ''] : [])]}
                             loading={loadingProduits} error={errors.produits} emptyMsg="Aucun produit"
                             rows={produits.map(p => [
                                 <TD key="nts"><Badge value={p.NTS} color={C.produits.accent} bg={C.produits.light} /></TD>,
                                 <TD key="lib" style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#64748b', fontSize: '12px' }}>{p.Libelle}</TD>,
-                                ...(isAdmin ? [<TD key="del"><button onClick={() => handleDelete('produit', p.NTS)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '2px', borderRadius: '4px', transition: 'color 0.2s' }}
-                                    onMouseEnter={e => e.target.style.color = '#ef4444'} onMouseLeave={e => e.target.style.color = '#cbd5e1'}><Trash2 size={13} /></button></TD>] : [])
+                                ...(isAdmin ? [
+                                    <TD key="edit"><button onClick={() => openEditModal('nts', p)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '2px', borderRadius: '4px', transition: 'color 0.2s' }}
+                                        onMouseEnter={e => e.target.style.color = C.produits.accent} onMouseLeave={e => e.target.style.color = '#cbd5e1'}><Pencil size={13} /></button></TD>,
+                                    <TD key="del"><button onClick={() => handleDelete('produit', p.NTS)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '2px', borderRadius: '4px', transition: 'color 0.2s' }}
+                                        onMouseEnter={e => e.target.style.color = '#ef4444'} onMouseLeave={e => e.target.style.color = '#cbd5e1'}><Trash2 size={13} /></button></TD>
+                                ] : [])
                             ])}
                         />
                     </BlockCard>
@@ -525,15 +567,19 @@ export default function TarifsManager() {
                         <DataTable
                             maxHeight="280px"
                             grad={C.taxes.grad} color={C.taxes.accent}
-                            headers={['Code', 'Libellé', 'Libellé long', 'Niv.', ...(isAdmin ? [''] : [])]}
+                            headers={['Code', 'Libellé', 'Libellé long', 'Niv.', ...(isAdmin ? ['', ''] : [])]}
                             loading={loadingTaxes} error={errors.taxes} emptyMsg="Aucune taxe"
                             rows={filteredTaxes.map(t => [
                                 <TD key="code"><Badge value={t.CodeTaxe} color={C.taxes.accent} bg={C.taxes.light} /></TD>,
                                 <TD key="lib" style={{ fontSize: '12px', maxWidth: '90px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.LibelleTaxe}</TD>,
                                 <TD key="libl" style={{ fontSize: '11px', color: '#94a3b8', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.LibelleTaxeComplet}</TD>,
                                 <TD key="niv" style={{ fontSize: '12px', fontWeight: 700 }}>{t.Niveau}</TD>,
-                                ...(isAdmin ? [<TD key="del"><button onClick={() => handleDelete('taxe', t.IDTaxes)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '2px', borderRadius: '4px', transition: 'color 0.2s' }}
-                                    onMouseEnter={e => e.target.style.color = '#ef4444'} onMouseLeave={e => e.target.style.color = '#cbd5e1'}><Trash2 size={13} /></button></TD>] : [])
+                                ...(isAdmin ? [
+                                    <TD key="edit"><button onClick={() => openEditModal('taxe', t)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '2px', borderRadius: '4px', transition: 'color 0.2s' }}
+                                        onMouseEnter={e => e.target.style.color = C.taxes.accent} onMouseLeave={e => e.target.style.color = '#cbd5e1'}><Pencil size={13} /></button></TD>,
+                                    <TD key="del"><button onClick={() => handleDelete('taxe', t.IDTaxes)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '2px', borderRadius: '4px', transition: 'color 0.2s' }}
+                                        onMouseEnter={e => e.target.style.color = '#ef4444'} onMouseLeave={e => e.target.style.color = '#cbd5e1'}><Trash2 size={13} /></button></TD>
+                                ] : [])
                             ])}
                         />
                     </BlockCard>
@@ -550,13 +596,17 @@ export default function TarifsManager() {
                         <DataTable
                             maxHeight="280px"
                             grad={C.taux.grad} color={C.taux.accent}
-                            headers={['Code Taux', 'Valeur', ...(isAdmin ? [''] : [])]}
+                            headers={['Code Taux', 'Valeur', ...(isAdmin ? ['', ''] : [])]}
                             loading={loadingTaux} error={errors.taux} emptyMsg="Aucun taux"
                             rows={filteredTaux.map(t => [
                                 <TD key="code"><Badge value={t.CodeTaux} color={C.taux.accent} bg={C.taux.light} /></TD>,
                                 <TD key="val"><span style={{ fontFamily: 'monospace', fontWeight: 800, color: C.taux.accent, fontSize: '14px' }}>{t.Taux}</span></TD>,
-                                ...(isAdmin ? [<TD key="del"><button onClick={() => handleDelete('taux', t.IDTaux)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '2px', borderRadius: '4px', transition: 'color 0.2s' }}
-                                    onMouseEnter={e => e.target.style.color = '#ef4444'} onMouseLeave={e => e.target.style.color = '#cbd5e1'}><Trash2 size={13} /></button></TD>] : [])
+                                ...(isAdmin ? [
+                                    <TD key="edit"><button onClick={() => openEditModal('taux', t)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '2px', borderRadius: '4px', transition: 'color 0.2s' }}
+                                        onMouseEnter={e => e.target.style.color = C.taux.accent} onMouseLeave={e => e.target.style.color = '#cbd5e1'}><Pencil size={13} /></button></TD>,
+                                    <TD key="del"><button onClick={() => handleDelete('taux', t.IDTaux)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '2px', borderRadius: '4px', transition: 'color 0.2s' }}
+                                        onMouseEnter={e => e.target.style.color = '#ef4444'} onMouseLeave={e => e.target.style.color = '#cbd5e1'}><Trash2 size={13} /></button></TD>
+                                ] : [])
                             ])}
                         />
                     </BlockCard>
@@ -840,6 +890,71 @@ export default function TarifsManager() {
                                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                                     <button type="button" onClick={closeModal} style={{ padding: '9px 20px', border: '1.5px solid #e2e8f0', background: 'white', color: '#64748b', borderRadius: '10px', fontWeight: 700, cursor: 'pointer' }}>Annuler</button>
                                     <button type="submit" disabled={saving} style={{ padding: '9px 24px', background: C.taux.grad, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Enregistrement...' : '+ Ajouter'}</button>
+                                </div>
+                            </form>
+                        )}
+
+                        {/* EDIT NTS */}
+                        {modal.type === 'edit-nts' && (
+                            <form onSubmit={handleEditNTS}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.5rem' }}>
+                                    <div style={{ width: '40px', height: '40px', borderRadius: '11px', background: C.produits.grad, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}><Pencil size={20} /></div>
+                                    <div>
+                                        <div style={{ fontSize: '16px', fontWeight: 900, color: '#0f172a' }}>Modifier le produit NTS</div>
+                                        <div style={{ fontSize: '12px', color: '#94a3b8', fontFamily: 'monospace', fontWeight: 700 }}>{formNTS.NTS}</div>
+                                    </div>
+                                </div>
+                                <div style={{ marginBottom: '1.5rem' }}>
+                                    {fLabel('Libellé *')}
+                                    {fInput({ placeholder: 'Libellé du produit tarifaire', value: formNTS.Libelle, onChange: e => setFormNTS(f => ({ ...f, Libelle: e.target.value })), required: true })}
+                                </div>
+                                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                                    <button type="button" onClick={closeModal} style={{ padding: '9px 20px', border: '1.5px solid #e2e8f0', background: 'white', color: '#64748b', borderRadius: '10px', fontWeight: 700, cursor: 'pointer' }}>Annuler</button>
+                                    <button type="submit" disabled={saving} style={{ padding: '9px 24px', background: C.produits.grad, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Enregistrement...' : 'Enregistrer'}</button>
+                                </div>
+                            </form>
+                        )}
+
+                        {/* EDIT TAXE */}
+                        {modal.type === 'edit-taxe' && (
+                            <form onSubmit={handleEditTaxe}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.5rem' }}>
+                                    <div style={{ width: '40px', height: '40px', borderRadius: '11px', background: C.taxes.grad, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}><Pencil size={20} /></div>
+                                    <div>
+                                        <div style={{ fontSize: '16px', fontWeight: 900, color: '#0f172a' }}>Modifier la taxe</div>
+                                        <div style={{ fontSize: '12px', color: '#94a3b8', fontFamily: 'monospace', fontWeight: 700 }}>{formTaxe.CodeTaxe}</div>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '1rem' }}>
+                                    <div>{fLabel('Niveau *')}{fInput({ type: 'number', step: '0.01', placeholder: '1', value: formTaxe.Niveau, onChange: e => setFormTaxe(f => ({ ...f, Niveau: e.target.value })), required: true })}</div>
+                                    <div>{fLabel('Base')}{fInput({ placeholder: 'Ex: V ou QC', value: formTaxe.Base, onChange: e => setFormTaxe(f => ({ ...f, Base: e.target.value })) })}</div>
+                                </div>
+                                <div style={{ marginBottom: '1rem' }}>{fLabel('Libellé court *')}{fInput({ placeholder: 'Ex: DROIT DE DOUANE', value: formTaxe.LibelleTaxe, onChange: e => setFormTaxe(f => ({ ...f, LibelleTaxe: e.target.value })), required: true })}</div>
+                                <div style={{ marginBottom: '1.5rem' }}>{fLabel('Libellé complet')}{fInput({ placeholder: 'Libellé long', value: formTaxe.LibelleTaxeComplet, onChange: e => setFormTaxe(f => ({ ...f, LibelleTaxeComplet: e.target.value })) })}</div>
+                                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                                    <button type="button" onClick={closeModal} style={{ padding: '9px 20px', border: '1.5px solid #e2e8f0', background: 'white', color: '#64748b', borderRadius: '10px', fontWeight: 700, cursor: 'pointer' }}>Annuler</button>
+                                    <button type="submit" disabled={saving} style={{ padding: '9px 24px', background: C.taxes.grad, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Enregistrement...' : 'Enregistrer'}</button>
+                                </div>
+                            </form>
+                        )}
+
+                        {/* EDIT TAUX */}
+                        {modal.type === 'edit-taux' && (
+                            <form onSubmit={handleEditTaux}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.5rem' }}>
+                                    <div style={{ width: '40px', height: '40px', borderRadius: '11px', background: C.taux.grad, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}><Pencil size={20} /></div>
+                                    <div>
+                                        <div style={{ fontSize: '16px', fontWeight: 900, color: '#0f172a' }}>Modifier le taux</div>
+                                        <div style={{ fontSize: '12px', color: '#94a3b8', fontFamily: 'monospace', fontWeight: 700 }}>{formTaux.CodeTaux}</div>
+                                    </div>
+                                </div>
+                                <div style={{ marginBottom: '1.5rem' }}>
+                                    {fLabel('Valeur *')}
+                                    {fInput({ type: 'number', step: '0.0001', placeholder: 'Ex: 5.00', value: formTaux.Taux, onChange: e => setFormTaux(f => ({ ...f, Taux: e.target.value })), required: true })}
+                                </div>
+                                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                                    <button type="button" onClick={closeModal} style={{ padding: '9px 20px', border: '1.5px solid #e2e8f0', background: 'white', color: '#64748b', borderRadius: '10px', fontWeight: 700, cursor: 'pointer' }}>Annuler</button>
+                                    <button type="submit" disabled={saving} style={{ padding: '9px 24px', background: C.taux.grad, color: 'white', border: 'none', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Enregistrement...' : 'Enregistrer'}</button>
                                 </div>
                             </form>
                         )}
