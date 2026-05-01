@@ -113,6 +113,27 @@ router.post('/', checkPermission('PRODUITS', 'can_create'), async (req, res) => 
     }
 });
 
+// PUT /api/produits/:nts - Update product label
+router.put('/:nts', checkPermission('PRODUITS', 'can_edit'), async (req, res) => {
+    try {
+        const { Libelle } = req.body;
+        if (!Libelle) {
+            return res.status(400).json({ error: 'Libelle est obligatoire' });
+        }
+        const [result] = await pool.query(
+            'UPDATE produits SET Libelle = ? WHERE NTS = ?',
+            [Libelle, req.params.nts]
+        );
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Produit introuvable' });
+        }
+        res.json({ message: 'Produit mis à jour avec succès' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 // DELETE /api/produits/:nts - Delete product by NTS
 router.delete('/:nts', checkPermission('PRODUITS', 'can_delete'), async (req, res) => {
     try {

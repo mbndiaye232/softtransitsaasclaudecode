@@ -59,6 +59,27 @@ router.post('/', checkPermission('TAXES', 'can_create'), async (req, res) => {
     }
 });
 
+// PUT /api/taxes/:id - Update a taxe
+router.put('/:id', checkPermission('TAXES', 'can_edit'), async (req, res) => {
+    try {
+        const { LibelleTaxe, LibelleTaxeComplet, Base, Niveau } = req.body;
+        if (!LibelleTaxe) {
+            return res.status(400).json({ error: 'LibelleTaxe est obligatoire' });
+        }
+        const [result] = await pool.query(
+            'UPDATE taxes SET LibelleTaxe = ?, LibelleTaxeComplet = ?, Base = ?, Niveau = ? WHERE IDTaxes = ?',
+            [LibelleTaxe, LibelleTaxeComplet || '', Base || '', Niveau || 1, req.params.id]
+        );
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Taxe introuvable' });
+        }
+        res.json({ message: 'Taxe mise à jour avec succès' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 // DELETE /api/taxes/:id - Delete a taxe
 router.delete('/:id', checkPermission('TAXES', 'can_delete'), async (req, res) => {
     try {
