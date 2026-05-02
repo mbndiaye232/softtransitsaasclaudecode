@@ -643,8 +643,17 @@ export default function TarifsManager() {
                 {/* ── COMPLÉMENTS TAXES ── */}
                 {isAdmin && (
                     <div style={{ marginBottom: '1.25rem' }}>
-                        <div style={{ borderRadius: '18px', overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.1)', border: '1px solid #ddd6fe' }}>
-                            <div style={{ background: 'linear-gradient(135deg,#6d28d9,#8b5cf6)', padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{
+                            borderRadius: '18px', overflow: 'hidden',
+                            boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
+                            border: '1px solid #ddd6fe',
+                        }}>
+                            {/* Header */}
+                            <div style={{
+                                background: 'linear-gradient(135deg,#6d28d9,#8b5cf6)',
+                                padding: '1rem 1.5rem',
+                                display: 'flex', alignItems: 'center', gap: '10px',
+                            }}>
                                 <div style={{ width: '34px', height: '34px', borderRadius: '9px', background: 'rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
                                     <GitMerge size={18} />
                                 </div>
@@ -655,8 +664,9 @@ export default function TarifsManager() {
                                     </div>
                                 </div>
                             </div>
+
                             <div style={{ background: 'white', padding: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                                {/* Colonne gauche : sélection de la taxe principale */}
+                                {/* Left: tax selector */}
                                 <div>
                                     <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '10px' }}>
                                         1. Sélectionner la taxe principale
@@ -665,15 +675,19 @@ export default function TarifsManager() {
                                         {taxes.map(t => {
                                             const isSel = selectedTaxe?.CodeTaxe === t.CodeTaxe;
                                             return (
-                                                <div key={t.IDTaxes} onClick={() => handleSelectTaxe(t)} style={{
-                                                    display: 'flex', alignItems: 'center', gap: '10px',
-                                                    padding: '9px 14px', cursor: 'pointer',
-                                                    borderBottom: '1px solid #f1f5f9',
-                                                    background: isSel ? '#f5f3ff' : 'transparent',
-                                                    borderLeft: isSel ? '3px solid #7c3aed' : '3px solid transparent',
-                                                    transition: 'all 0.15s',
-                                                }}>
-                                                    <span style={{ fontFamily: 'monospace', fontSize: '12px', fontWeight: 800, background: '#f5f3ff', color: '#7c3aed', padding: '2px 7px', borderRadius: '5px', minWidth: '28px', textAlign: 'center' }}>{t.CodeTaxe}</span>
+                                                <div key={t.IDTaxes}
+                                                    onClick={() => handleSelectTaxe(t)}
+                                                    style={{
+                                                        display: 'flex', alignItems: 'center', gap: '10px',
+                                                        padding: '9px 14px', cursor: 'pointer',
+                                                        borderBottom: '1px solid #f1f5f9',
+                                                        background: isSel ? '#f5f3ff' : 'transparent',
+                                                        borderLeft: isSel ? '3px solid #7c3aed' : '3px solid transparent',
+                                                        transition: 'all 0.15s',
+                                                    }}>
+                                                    <span style={{ fontFamily: 'monospace', fontSize: '12px', fontWeight: 800, background: '#f5f3ff', color: '#7c3aed', padding: '2px 7px', borderRadius: '5px', minWidth: '28px', textAlign: 'center' }}>
+                                                        {t.CodeTaxe}
+                                                    </span>
                                                     <span style={{ fontSize: '12px', color: '#334155', fontWeight: isSel ? 700 : 400 }}>{t.LibelleTaxe}</span>
                                                     <span style={{ marginLeft: 'auto', fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>Niv.{t.Niveau}</span>
                                                 </div>
@@ -681,7 +695,8 @@ export default function TarifsManager() {
                                         })}
                                     </div>
                                 </div>
-                                {/* Colonne droite : cases à cocher des compléments */}
+
+                                {/* Right: complement checkboxes */}
                                 <div>
                                     <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '10px' }}>
                                         2. Taxes dont les montants s'ajoutent au CAF
@@ -696,15 +711,23 @@ export default function TarifsManager() {
                                                 {taxes.filter(t => t.CodeTaxe !== selectedTaxe.CodeTaxe).map(t => {
                                                     const isChecked = complementCodes.includes(t.CodeTaxe);
                                                     return (
-                                                        <label key={t.IDTaxes} style={{
-                                                            display: 'flex', alignItems: 'center', gap: '10px',
-                                                            padding: '8px 14px', cursor: 'pointer',
-                                                            borderBottom: '1px solid #f1f5f9',
-                                                            background: isChecked ? '#f0fdf4' : 'transparent',
-                                                            transition: 'background 0.15s',
-                                                        }}>
-                                                            <input type="checkbox" checked={isChecked} onChange={() => toggleComplement(t.CodeTaxe)} style={{ accentColor: '#7c3aed', width: '15px', height: '15px' }} />
-                                                            <span style={{ fontFamily: 'monospace', fontSize: '12px', fontWeight: 800, background: '#f5f3ff', color: '#7c3aed', padding: '2px 7px', borderRadius: '5px', minWidth: '28px', textAlign: 'center' }}>{t.CodeTaxe}</span>
+                                                        <label key={t.IDTaxes}
+                                                            style={{
+                                                                display: 'flex', alignItems: 'center', gap: '10px',
+                                                                padding: '8px 14px', cursor: 'pointer',
+                                                                borderBottom: '1px solid #f1f5f9',
+                                                                background: isChecked ? '#f0fdf4' : 'transparent',
+                                                                transition: 'background 0.15s',
+                                                            }}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isChecked}
+                                                                onChange={() => toggleComplement(t.CodeTaxe)}
+                                                                style={{ accentColor: '#7c3aed', width: '15px', height: '15px' }}
+                                                            />
+                                                            <span style={{ fontFamily: 'monospace', fontSize: '12px', fontWeight: 800, background: '#f5f3ff', color: '#7c3aed', padding: '2px 7px', borderRadius: '5px', minWidth: '28px', textAlign: 'center' }}>
+                                                                {t.CodeTaxe}
+                                                            </span>
                                                             <span style={{ fontSize: '12px', color: '#334155' }}>{t.LibelleTaxe}</span>
                                                             <span style={{ marginLeft: 'auto', fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>Niv.{t.Niveau}</span>
                                                         </label>
@@ -712,13 +735,20 @@ export default function TarifsManager() {
                                                 })}
                                             </div>
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                                <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>{complementCodes.length} complément(s)</span>
-                                                <button onClick={handleSaveComplements} disabled={savingComplements} style={{
-                                                    background: 'linear-gradient(135deg,#6d28d9,#8b5cf6)', color: 'white',
-                                                    border: 'none', borderRadius: '9px', padding: '9px 22px',
-                                                    fontWeight: 800, fontSize: '13px', cursor: savingComplements ? 'not-allowed' : 'pointer',
-                                                    opacity: savingComplements ? 0.7 : 1, boxShadow: '0 4px 12px rgba(109,40,217,0.3)',
-                                                }}>
+                                                <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>
+                                                    {complementCodes.length} complément(s) sélectionné(s)
+                                                </span>
+                                                <button
+                                                    onClick={handleSaveComplements}
+                                                    disabled={savingComplements}
+                                                    style={{
+                                                        background: 'linear-gradient(135deg,#6d28d9,#8b5cf6)',
+                                                        color: 'white', border: 'none', borderRadius: '9px',
+                                                        padding: '9px 22px', fontWeight: 800, fontSize: '13px',
+                                                        cursor: savingComplements ? 'not-allowed' : 'pointer',
+                                                        opacity: savingComplements ? 0.7 : 1,
+                                                        boxShadow: '0 4px 12px rgba(109,40,217,0.3)',
+                                                    }}>
                                                     {savingComplements ? 'Enregistrement...' : '✓ Enregistrer les compléments'}
                                                 </button>
                                             </div>

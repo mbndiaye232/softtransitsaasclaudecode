@@ -7,6 +7,7 @@ router.use(authMiddleware);
 router.use(tenantMiddleware);
 
 // GET /api/taxes-complements?codeTaxe=05
+// Returns complement codes for a given principal tax (or all if no filter)
 router.get('/', checkPermission('TAXES', 'can_view'), async (req, res) => {
     try {
         const { codeTaxe } = req.query;
@@ -31,13 +32,15 @@ router.get('/', checkPermission('TAXES', 'can_view'), async (req, res) => {
     }
 });
 
-// PUT /api/taxes-complements/:codeTaxe — replace all complements for a principal tax
+// PUT /api/taxes-complements/:codeTaxe
+// Replace all complements for a principal tax
 router.put('/:codeTaxe', checkPermission('TAXES', 'can_edit'), async (req, res) => {
     const connection = await pool.getConnection();
     try {
         const { codeTaxe } = req.params;
-        const { complementCodes } = req.body;
+        const { complementCodes } = req.body; // array of CodeTaxe strings
 
+        // Get IDTaxes for the principal tax
         const [principal] = await connection.query(
             'SELECT IDTaxes FROM taxes WHERE CodeTaxe = ?', [codeTaxe]
         );
@@ -48,15 +51,18 @@ router.put('/:codeTaxe', checkPermission('TAXES', 'can_edit'), async (req, res) 
 
         await connection.beginTransaction();
 
+        // Delete existing complements for this tax
         await connection.query(
             'DELETE FROM taxes_complements WHERE CodeTaxePrincipal = ?', [codeTaxe]
         );
 
+        // Insert new complements
         if (complementCodes && complementCodes.length > 0) {
             const [complements] = await connection.query(
                 'SELECT IDTaxes, CodeTaxe FROM taxes WHERE CodeTaxe IN (?)',
                 [complementCodes]
             );
+
             for (const comp of complements) {
                 await connection.query(
                     `INSERT INTO taxes_complements
