@@ -83,4 +83,5 @@ router.put('/:codeTaxe', checkPermission('TAXES', 'can_edit'), async (req, res) 
         connection.release();
     }
 });
+
 module.exports = router;
