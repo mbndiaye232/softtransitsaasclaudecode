@@ -433,20 +433,25 @@ router.put('/articles/:id', checkPermission('NOTES', 'can_edit'), async (req, re
             CommissionFournisseur, NBCOLIS, IDDEVISEFOB, IDDEVISEFRET, IDDEVISEASS
         } = req.body;
 
+        const toFloat = v => (v === '' || v === null || v === undefined) ? 0 : parseFloat(v) || 0;
+        const toInt   = v => (v === '' || v === null || v === undefined) ? 0 : parseInt(v)   || 0;
+
         await pool.query(
-            `UPDATE articles SET 
-                NTS = ?, Libelle = ?, CodeRegimeDeclaration = ?, 
+            `UPDATE articles SET
+                NTS = ?, Libelle = ?, CodeRegimeDeclaration = ?,
                 Origine = ?, Provenance = ?, FOB = ?, FRET = ?, ASSURANCES = ?,
                 DPI = ?, TitreExo = ?, BRUT = ?, NET = ?, QC = ?, QM = ?,
-                CommissionFournisseur = ?, NBCOLIS = ?, 
+                CommissionFournisseur = ?, NBCOLIS = ?,
                 IDDEVISEFOB = ?, IDDEVISEFRET = ?, IDDEVISEASS = ?
             WHERE IDArticles = ?`,
             [
-                NTS, Libelle, CodeRegimeDeclaration,
-                Origine, Provenance, FOB, Fret, Assurances,
-                DPI, TitreExo, BRUT, NET, QC, QM,
-                CommissionFournisseur, NBCOLIS,
-                IDDEVISEFOB, IDDEVISEFRET, IDDEVISEASS,
+                NTS || null, Libelle || null, CodeRegimeDeclaration || null,
+                Origine || null, Provenance || null,
+                toFloat(FOB), toFloat(Fret), toFloat(Assurances),
+                DPI || null, TitreExo || null,
+                toFloat(BRUT), toFloat(NET), toFloat(QC), toFloat(QM),
+                toFloat(CommissionFournisseur), toInt(NBCOLIS),
+                toInt(IDDEVISEFOB) || 1, toInt(IDDEVISEFRET) || 1, toInt(IDDEVISEASS) || 1,
                 req.params.id
             ]
         );
