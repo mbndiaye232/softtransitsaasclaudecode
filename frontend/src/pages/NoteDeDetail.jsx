@@ -47,18 +47,19 @@ const Panel = ({ colorKey, icon, title, badge, action, children, height = 240 })
 };
 
 /* ─── MiniTable ──────────────────────────────────────────────────────────── */
-const MiniTable = ({ cols, rows, selectedId, onSelect, getKey, getCells, emptyMsg }) => (
+const MiniTable = ({ cols, rows, selectedId, onSelect, getKey, getCells, emptyMsg, onDelete }) => (
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
         <thead>
             <tr style={{ background: '#f8fafc', position: 'sticky', top: 0, zIndex: 1 }}>
                 {cols.map((c, i) => (
                     <th key={i} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.06em', borderBottom: '1px solid #f1f5f9' }}>{c}</th>
                 ))}
+                {onDelete && <th style={{ width: 32, borderBottom: '1px solid #f1f5f9' }} />}
             </tr>
         </thead>
         <tbody>
             {rows.length === 0 ? (
-                <tr><td colSpan={cols.length} style={{ padding: '24px', textAlign: 'center', color: '#d1d5db', fontSize: 12 }}>{emptyMsg}</td></tr>
+                <tr><td colSpan={cols.length + (onDelete ? 1 : 0)} style={{ padding: '24px', textAlign: 'center', color: '#d1d5db', fontSize: 12 }}>{emptyMsg}</td></tr>
             ) : rows.map(row => {
                 const key = getKey(row);
                 const sel = selectedId === key;
@@ -70,6 +71,17 @@ const MiniTable = ({ cols, rows, selectedId, onSelect, getKey, getCells, emptyMs
                         {getCells(row, sel).map((cell, i) => (
                             <td key={i} style={{ padding: '8px 12px', color: sel ? '#5b21b6' : '#374151', fontWeight: i === 0 ? 700 : 400 }}>{cell}</td>
                         ))}
+                        {onDelete && (
+                            <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                                <button
+                                    onClick={e => { e.stopPropagation(); onDelete(row); }}
+                                    title="Supprimer"
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '2px 4px', borderRadius: 4, lineHeight: 1, fontSize: 14 }}
+                                    onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
+                                    onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                                >✕</button>
+                            </td>
+                        )}
                     </tr>
                 );
             })}
@@ -245,6 +257,18 @@ export default function NoteDeDetail() {
             showMessage('Note créée','success');
             loadNotes(selectedDossier.id||selectedDossier.IDDossiers);
         } catch(e) { showMessage('Erreur création note','error'); }
+    };
+
+    const handleDeleteNote = async (note) => {
+        if (!window.confirm(`Supprimer la référence ${note.REPERTOIRE || 'EN ATTENTE'} ?`)) return;
+        try {
+            await notesAPI.delete(note.IDNotesDeDetails);
+            if (selectedNote?.IDNotesDeDetails === note.IDNotesDeDetails) {
+                setSelectedNote(null);
+            }
+            showMessage('Référence supprimée','success');
+            loadNotes(selectedDossier.id||selectedDossier.IDDossiers);
+        } catch(e) { showMessage('Erreur suppression','error'); }
     };
 
     const handleSaveAllArticles = async () => {
@@ -515,8 +539,9 @@ export default function NoteDeDetail() {
                         selectedId={selectedNote?.IDNotesDeDetails}
                         onSelect={setSelectedNote}
                         getKey={n=>n.IDNotesDeDetails}
-                        getCells={(n)=>[n.REPERTOIRE||'EN ATTENTE', `Agent: ${n.IdAgent}`]}
+                        getCells={(n)=>[n.REPERTOIRE||'EN ATTENTE', n.agent_name||'—']}
                         emptyMsg={selectedDossier?'Aucune note':'← Sélectionnez un dossier'}
+                        onDelete={handleDeleteNote}
                     />
                 </Panel>
             </div>
