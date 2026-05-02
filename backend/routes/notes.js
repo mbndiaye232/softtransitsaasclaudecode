@@ -13,10 +13,12 @@ router.get('/', checkPermission('NOTES', 'can_view'), async (req, res) => {
     try {
         const { dossier_id } = req.query;
         let query = `
-            SELECT n.*, d.Libelle as dossier_label, s.NomSociete as company_name
+            SELECT n.*, d.Libelle as dossier_label, s.NomSociete as company_name,
+                   a.NomAgent as agent_name
             FROM notesdedetails n
             JOIN dossiers d ON n.IDDossiers = d.IDDossiers
             JOIN structur s ON d.structur_id = s.IDSociete
+            LEFT JOIN agents a ON n.IdAgent = a.IDAgents
         `;
         const params = [];
 
