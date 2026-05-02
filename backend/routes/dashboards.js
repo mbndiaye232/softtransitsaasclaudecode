@@ -44,6 +44,12 @@ router.get('/transport-arrivals', checkPermission('DOSSIERS', 'can_view'), async
             params.push(req.structur_id);
         }
 
+        // Declarant (USER role) sees only dossiers assigned to them
+        if (req.user.role === 'USER') {
+            query += ' AND d.IdAgentSaisi = ?';
+            params.push(req.user.id);
+        }
+
         query += ' ORDER BY t.DateArriveePrevue ASC';
 
         const [rows] = await pool.query(query, params);
