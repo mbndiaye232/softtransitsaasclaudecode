@@ -1,95 +1,181 @@
-import { useState, useEffect } from 'react'
+const GROUPS = [
+    {
+        label: 'Dossiers & Transit',
+        color: '#0369a1',
+        modules: [
+            { code: 'DOSSIERS',  label: 'Gestion des Dossiers' },
+            { code: 'COTATIONS', label: 'Gestion des Cotations' },
+            { code: 'NOTES',     label: 'Notes de Détails' },
+        ]
+    },
+    {
+        label: 'Clients & Relations',
+        color: '#7c3aed',
+        modules: [
+            { code: 'CLIENTS', label: 'Gestion des Clients' },
+            { code: 'TIERS',   label: 'Gestion des Tiers' },
+        ]
+    },
+    {
+        label: 'Finances',
+        color: '#059669',
+        modules: [
+            { code: 'FACTURES', label: 'Factures & Règlements' },
+            { code: 'FINANCES', label: 'Tableaux de bord financiers' },
+        ]
+    },
+    {
+        label: 'Catalogue & Tarifs',
+        color: '#d97706',
+        modules: [
+            { code: 'PRODUITS', label: 'Référentiel Produits' },
+            { code: 'TAXES',    label: 'Référentiel Taxes & Tarifs' },
+        ]
+    },
+    {
+        label: 'Administration',
+        color: '#dc2626',
+        modules: [
+            { code: 'AGENTS',     label: 'Gestion des Agents' },
+            { code: 'GROUPES',    label: 'Gestion des Groupes' },
+            { code: 'STRUCTURES', label: 'Configuration Sociétés' },
+        ]
+    },
+    {
+        label: 'Référentiels',
+        color: '#0891b2',
+        modules: [
+            { code: 'PAYS',     label: 'Référentiel Pays' },
+            { code: 'DEVISES',  label: 'Référentiel Devises' },
+            { code: 'REGIMES',  label: 'Référentiel Régimes & Unités' },
+            { code: 'STATUTS',  label: 'Référentiel Étapes Dossiers' },
+            { code: 'RUBRIQUES',label: 'Référentiel Rubriques' },
+        ]
+    },
+    {
+        label: 'Configuration Système',
+        color: '#475569',
+        modules: [
+            { code: 'CONFIG',              label: 'Configuration Générale (moyens transport, lieux, types docs…)' },
+            { code: 'PARAMETRES_GENERAUX', label: 'Paramètres Système (sauvegardes, codes couleurs)' },
+        ]
+    },
+]
 
-const MODULES = [
-    { code: 'DOSSIERS', label: 'Gestion des Dossiers' },
-    { code: 'CLIENTS', label: 'Gestion des Clients' },
-    { code: 'FACTURES', label: 'Gestion des Factures' },
-    { code: 'COTATIONS', label: 'Gestion des Cotations' },
-    { code: 'NOTES', label: 'Notes de Détails' },
-    { code: 'STRUCTURES', label: 'Configuration Sociétés' },
-    { code: 'AGENTS', label: 'Gestion des Agents' },
-    { code: 'PAYS', label: 'Référentiel Pays' },
-    { code: 'TAXES', label: 'Référentiel Taxes' },
-    { code: 'DEVISES', label: 'Référentiel Devises' },
-    { code: 'PRODUITS', label: 'Référentiel Produits' },
-    { code: 'REGIMES', label: 'Référentiel Régimes' },
-    { code: 'STATUTS', label: 'Référentiel Statuts' },
-    { code: 'GROUPES', label: 'Gestion des Groupes' }
+const ACTIONS = [
+    { key: 'can_view',   label: 'Voir',      color: '#3b82f6' },
+    { key: 'can_create', label: 'Créer',     color: '#10b981' },
+    { key: 'can_edit',   label: 'Modifier',  color: '#f59e0b' },
+    { key: 'can_delete', label: 'Supprimer', color: '#ef4444' },
 ]
 
 export default function PermissionMatrix({ permissions = [], onChange, readOnly = false }) {
-    // permissions is an array of { code, can_view, can_create, can_edit, can_delete }
-
     const handleCheck = (moduleCode, action, checked) => {
         if (readOnly) return
-
         const newPermissions = [...permissions]
-        const existingIndex = newPermissions.findIndex(p => p.code === moduleCode)
-
-        if (existingIndex >= 0) {
-            newPermissions[existingIndex] = {
-                ...newPermissions[existingIndex],
-                [action]: checked ? 1 : 0
-            }
+        const idx = newPermissions.findIndex(p => p.code === moduleCode)
+        if (idx >= 0) {
+            newPermissions[idx] = { ...newPermissions[idx], [action]: checked ? 1 : 0 }
         } else {
-            newPermissions.push({
-                code: moduleCode,
-                can_view: 0,
-                can_create: 0,
-                can_edit: 0,
-                can_delete: 0,
-                [action]: checked ? 1 : 0
-            })
+            newPermissions.push({ code: moduleCode, can_view: 0, can_create: 0, can_edit: 0, can_delete: 0, [action]: checked ? 1 : 0 })
         }
-
         onChange(newPermissions)
     }
 
-    const getPerm = (code) => {
-        return permissions.find(p => p.code === code) || { can_view: 0, can_create: 0, can_edit: 0, can_delete: 0 }
+    const handleGroupCheck = (modules, action, checked) => {
+        if (readOnly) return
+        const newPermissions = [...permissions]
+        for (const mod of modules) {
+            const idx = newPermissions.findIndex(p => p.code === mod.code)
+            if (idx >= 0) {
+                newPermissions[idx] = { ...newPermissions[idx], [action]: checked ? 1 : 0 }
+            } else {
+                newPermissions.push({ code: mod.code, can_view: 0, can_create: 0, can_edit: 0, can_delete: 0, [action]: checked ? 1 : 0 })
+            }
+        }
+        onChange(newPermissions)
     }
 
+    const getPerm = (code) =>
+        permissions.find(p => p.code === code) || { can_view: 0, can_create: 0, can_edit: 0, can_delete: 0 }
+
+    const groupAllChecked = (modules, action) =>
+        modules.every(m => getPerm(m.code)[action] === 1)
+
+    const groupSomeChecked = (modules, action) =>
+        modules.some(m => getPerm(m.code)[action] === 1)
+
     return (
-        <div className="permission-matrix" style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+        <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                 <thead>
-                    <tr style={{ background: 'var(--bg-secondary)', borderBottom: '2px solid var(--border)' }}>
-                        <th style={{ padding: '0.75rem', textAlign: 'left' }}>Module</th>
-                        <th style={{ padding: '0.75rem', textAlign: 'center', width: '80px' }}>Voir</th>
-                        <th style={{ padding: '0.75rem', textAlign: 'center', width: '80px' }}>Créer</th>
-                        <th style={{ padding: '0.75rem', textAlign: 'center', width: '80px' }}>Modifier</th>
-                        <th style={{ padding: '0.75rem', textAlign: 'center', width: '80px' }}>Supprimer</th>
+                    <tr style={{ background: '#0f172a' }}>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'white', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            Module
+                        </th>
+                        {ACTIONS.map(a => (
+                            <th key={a.key} style={{ padding: '0.75rem', textAlign: 'center', width: '90px', color: 'white', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                {a.label}
+                            </th>
+                        ))}
                     </tr>
                 </thead>
                 <tbody>
-                    {MODULES.map(module => {
-                        const perm = getPerm(module.code)
-                        return (
-                            <tr key={module.code} style={{ borderBottom: '1px solid var(--border)' }}>
-                                <td style={{ padding: '0.75rem' }}>{module.label}</td>
-                                {[
-                                    { key: 'can_view', color: '#3b82f6' },
-                                    { key: 'can_create', color: '#10b981' },
-                                    { key: 'can_edit', color: '#f59e0b' },
-                                    { key: 'can_delete', color: '#ef4444' }
-                                ].map(action => (
-                                    <td key={action.key} style={{ textAlign: 'center', padding: '0.5rem' }}>
-                                        <input
-                                            type="checkbox"
-                                            checked={perm[action.key] === 1}
-                                            onChange={(e) => handleCheck(module.code, action.key, e.target.checked)}
-                                            disabled={readOnly}
-                                            style={{
-                                                accentColor: action.color,
-                                                transform: 'scale(1.2)',
-                                                cursor: readOnly ? 'not-allowed' : 'pointer'
-                                            }}
-                                        />
-                                    </td>
-                                ))}
+                    {GROUPS.map(group => (
+                        <>
+                            {/* Group header row */}
+                            <tr key={`group-${group.label}`} style={{ background: group.color + '18', borderTop: `2px solid ${group.color}40` }}>
+                                <td style={{ padding: '0.5rem 1rem', fontWeight: 700, fontSize: '0.78rem', color: group.color, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                    {group.label}
+                                </td>
+                                {ACTIONS.map(a => {
+                                    const allChecked = groupAllChecked(group.modules, a.key)
+                                    const someChecked = groupSomeChecked(group.modules, a.key)
+                                    return (
+                                        <td key={a.key} style={{ textAlign: 'center', padding: '0.4rem' }}>
+                                            {!readOnly && (
+                                                <input
+                                                    type="checkbox"
+                                                    title={`Tout cocher "${a.label}" pour ${group.label}`}
+                                                    checked={allChecked}
+                                                    ref={el => { if (el) el.indeterminate = someChecked && !allChecked }}
+                                                    onChange={e => handleGroupCheck(group.modules, a.key, e.target.checked)}
+                                                    style={{ accentColor: a.color, transform: 'scale(1.15)', cursor: 'pointer', opacity: 0.6 }}
+                                                />
+                                            )}
+                                        </td>
+                                    )
+                                })}
                             </tr>
-                        )
-                    })}
+                            {/* Module rows */}
+                            {group.modules.map((module, i) => {
+                                const perm = getPerm(module.code)
+                                const isLast = i === group.modules.length - 1
+                                return (
+                                    <tr key={module.code} style={{ borderBottom: isLast ? 'none' : '1px solid #f1f5f9', background: 'white' }}>
+                                        <td style={{ padding: '0.6rem 1rem 0.6rem 1.75rem', color: '#334155' }}>
+                                            {module.label}
+                                        </td>
+                                        {ACTIONS.map(a => (
+                                            <td key={a.key} style={{ textAlign: 'center', padding: '0.4rem' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={perm[a.key] === 1}
+                                                    onChange={e => handleCheck(module.code, a.key, e.target.checked)}
+                                                    disabled={readOnly}
+                                                    style={{
+                                                        accentColor: a.color,
+                                                        transform: 'scale(1.2)',
+                                                        cursor: readOnly ? 'not-allowed' : 'pointer'
+                                                    }}
+                                                />
+                                            </td>
+                                        ))}
+                                    </tr>
+                                )
+                            })}
+                        </>
+                    ))}
                 </tbody>
             </table>
         </div>
