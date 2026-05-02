@@ -13,7 +13,7 @@ router.use(tenantMiddleware);
 router.get('/transport-arrivals', checkPermission('DOSSIERS', 'can_view'), async (req, res) => {
     try {
         let query = `
-            SELECT 
+            SELECT
                 d.CodeDossier as code,
                 d.CodeDossierCourt as shortCode,
                 d.Libelle as label,
@@ -24,18 +24,23 @@ router.get('/transport-arrivals', checkPermission('DOSSIERS', 'can_view'), async
                 c.Vert as colorG,
                 c.Bleu as colorB
             FROM dossiers d
-            JOIN transports t ON d.IDDossiers = t.idbl OR d.IDDossiers = t.IdAgent -- Assuming relation via idbl or similar context. Using the dossier ID mapping. Let's adjust to correct foreign keys if needed.
+            JOIN transports t ON d.IDDossiers = t.idbl OR d.IDDossiers = t.IdAgent
             LEFT JOIN moyenstransport m ON t.IDMoyensTransport = m.IDMoyensTransport
-            LEFT JOIN couleurs c ON c.ndjours = (
-                CASE 
+            LEFT JOIN (
+                SELECT ndjours, MAX(Rouge) as Rouge, MAX(Vert) as Vert, MAX(Bleu) as Bleu
+                FROM couleurs
+                GROUP BY ndjours
+            ) c ON c.ndjours = (
+                CASE
                     WHEN DATEDIFF(t.DateArriveePrevue, CURDATE()) >= 10 THEN 10
-                    WHEN DATEDIFF(t.DateArriveePrevue, CURDATE()) < 0 THEN -1
+                    WHEN DATEDIFF(t.DateArriveePrevue, CURDATE()) < -2 THEN NULL
+                    WHEN DATEDIFF(t.DateArriveePrevue, CURDATE()) < 0  THEN -1
                     ELSE DATEDIFF(t.DateArriveePrevue, CURDATE())
                 END
             )
-            -- Optional: join with actual liaison table if transport is not directly linked this way
             WHERE t.DateArriveePrevue IS NOT NULL
               AND (d.Facturable IS NULL OR d.Facturable != -1)
+              AND DATEDIFF(t.DateArriveePrevue, CURDATE()) > -3
         `;
         let params = [];
 
@@ -44,9 +49,9 @@ router.get('/transport-arrivals', checkPermission('DOSSIERS', 'can_view'), async
             params.push(req.structur_id);
         }
 
-        // Declarant (USER role) sees only dossiers assigned to them
+        // Declarant (USER role) sees only dossiers assigned to them via declarations
         if (req.user.role === 'USER') {
-            query += ' AND d.IdAgentSaisi = ?';
+            query += ' AND EXISTS (SELECT 1 FROM declarations dec WHERE dec.IDDossiers = d.IDDossiers AND dec.IdAgent = ?)';
             params.push(req.user.id);
         }
 
