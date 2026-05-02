@@ -3,10 +3,10 @@ import { useAuth } from '../context/AuthContext'
 import { useBilling } from '../context/BillingContext'
 import { useNavigate } from 'react-router-dom'
 import DashboardMenu from './DashboardMenu'
-import { statisticsAPI } from '../services/api'
+import { statisticsAPI, dashboardsAPI } from '../services/api'
 import {
     CreditCard, Briefcase, Clock, Users, LogOut,
-    Building2, Mail, User, ShieldCheck, Sparkles, Zap
+    Building2, Mail, User, ShieldCheck, Sparkles, Zap, Anchor, ArrowRight
 } from 'lucide-react'
 
 export default function Dashboard() {
@@ -19,6 +19,7 @@ export default function Dashboard() {
         pendingNotes: 0,
         activeTeam: 0,
     })
+    const [arrivals, setArrivals] = useState([])
 
     useEffect(() => {
         refreshBilling()
@@ -30,7 +31,16 @@ export default function Dashboard() {
                 console.error('Error fetching dashboard stats:', err)
             }
         }
+        const fetchArrivals = async () => {
+            try {
+                const response = await dashboardsAPI.getTransportArrivals()
+                setArrivals(response.data)
+            } catch (err) {
+                console.error('Error fetching arrivals:', err)
+            }
+        }
         fetchStats()
+        fetchArrivals()
     }, [])
 
     const handleLogout = () => { logout(); navigate('/login') }
@@ -428,6 +438,97 @@ export default function Dashboard() {
                     {/* Menu grid */}
                     <div style={{ padding: '2rem' }}>
                         <DashboardMenu />
+                    </div>
+                </div>
+
+                {/* ── Arrivals card ── */}
+                <div style={{
+                    background: 'white', borderRadius: '20px',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.07)',
+                    overflow: 'hidden', marginBottom: '1.5rem',
+                }}>
+                    {/* Header */}
+                    <div style={{
+                        background: 'linear-gradient(135deg, #0c4a6e 0%, #0369a1 100%)',
+                        padding: '1rem 1.5rem',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{
+                                width: '34px', height: '34px', borderRadius: '9px',
+                                background: 'rgba(255,255,255,0.15)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}>
+                                <Anchor size={18} color="white" />
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.55)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                                    {user?.role === 'USER' ? 'Mes dossiers' : 'Vue globale'}
+                                </div>
+                                <div style={{ fontSize: '1rem', fontWeight: 900, color: 'white' }}>
+                                    {user?.role === 'USER' ? 'Mes prochaines arrivées' : 'Calendrier arrivées des navires'}
+                                </div>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => navigate('/transport-arrivals')}
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: '6px',
+                                background: 'rgba(255,255,255,0.15)',
+                                border: '1px solid rgba(255,255,255,0.25)',
+                                borderRadius: '8px', padding: '6px 14px',
+                                color: 'white', fontSize: '12px', fontWeight: 700,
+                                cursor: 'pointer',
+                            }}
+                        >
+                            Voir tout <ArrowRight size={13} />
+                        </button>
+                    </div>
+                    {/* Table */}
+                    <div style={{ overflowX: 'auto' }}>
+                        {arrivals.length === 0 ? (
+                            <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '13px', fontWeight: 600 }}>
+                                Aucune arrivée prévue
+                            </div>
+                        ) : (
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                                <thead>
+                                    <tr style={{ background: '#f8fafc' }}>
+                                        {['Code dossier', 'Libellé', 'Navire / Transport', 'Date arrivée', 'J. restants'].map((h, i) => (
+                                            <th key={i} style={{ padding: '10px 16px', textAlign: 'left', fontSize: '10px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #f1f5f9' }}>{h}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {arrivals.slice(0, 8).map((item, idx) => {
+                                        const r = item.colorR ?? 200, g = item.colorG ?? 200, b = item.colorB ?? 200;
+                                        const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                                        const bg = `rgb(${r},${g},${b})`;
+                                        const fg = lum > 0.55 ? '#1e293b' : 'white';
+                                        const days = item.daysRemaining;
+                                        return (
+                                            <tr key={idx} style={{ borderBottom: '1px solid #f8fafc' }}>
+                                                <td style={{ padding: '10px 16px', fontWeight: 700, color: '#0369a1' }}>{item.code || '—'}</td>
+                                                <td style={{ padding: '10px 16px', color: '#374151', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label || '—'}</td>
+                                                <td style={{ padding: '10px 16px', color: '#374151' }}>{item.transportMean || '—'}</td>
+                                                <td style={{ padding: '10px 16px', color: '#374151' }}>
+                                                    {item.dateArrivee ? new Date(item.dateArrivee).toLocaleDateString('fr-FR') : '—'}
+                                                </td>
+                                                <td style={{ padding: '6px 16px' }}>
+                                                    <span style={{
+                                                        display: 'inline-block', background: bg, color: fg,
+                                                        borderRadius: '99px', padding: '3px 12px',
+                                                        fontWeight: 800, fontSize: '12px', minWidth: '44px', textAlign: 'center',
+                                                    }}>
+                                                        {days != null ? (days < 0 ? `+${Math.abs(days)}j` : `${days}j`) : '—'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        )}
                     </div>
                 </div>
 
