@@ -53,6 +53,7 @@ import RegimesDeclarationPage from './pages/RegimesDeclarationPage'
 import CouleursPage from './pages/CouleursPage'
 import ReglementsPage from './pages/ReglementsPage'
 import CancellationManager from './pages/CancellationManager'
+import TransportArrivals from './pages/TransportArrivals'
 
 const ProtectedRoute = ({ children }) => {
     const { user, loading } = useAuth()
@@ -119,6 +120,7 @@ function AppRoutes() {
             <Route path="/decision-dashboard" element={<ProtectedWithBilling><DecisionDashboard /></ProtectedWithBilling>} />
             <Route path="/backups" element={<ProtectedWithBilling><BackupManager /></ProtectedWithBilling>} />
             <Route path="/suivi-traitements" element={<ProtectedWithBilling><SuiviTraitements /></ProtectedWithBilling>} />
+            <Route path="/transport-arrivals" element={<ProtectedWithBilling><TransportArrivals /></ProtectedWithBilling>} />
             <Route path="/tarifs" element={<ProtectedWithBilling><TarifsManager /></ProtectedWithBilling>} />
 
             {/* ── Settings hub sub-pages ── */}

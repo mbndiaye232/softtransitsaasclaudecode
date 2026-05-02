@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import {
     Building2, Users, UserSquare2, Briefcase, ClipboardList,
     BarChart3, FileText, Settings, LogOut, CreditCard, Key,
-    Save, Layers, LayoutDashboard, ChevronRight, ShieldCheck, Folders, Lock
+    Save, Layers, LayoutDashboard, ChevronRight, ShieldCheck, Folders, Lock, Anchor
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useBilling } from '../context/BillingContext'
@@ -20,7 +20,7 @@ const CATS = [
         label: 'Dossiers & Transit',
         color: '#0369a1',
         grad: 'linear-gradient(135deg,#0c4a6e,#0369a1)',
-        ids: ['dossiers', 'suivi', 'cotation', 'ot', 'config-ot', 'documents', 'notes', 'traitements'],
+        ids: ['dossiers', 'suivi', 'arrivees', 'cotation', 'ot', 'config-ot', 'documents', 'notes', 'traitements'],
     },
     {
         label: 'Documents & Finance',
@@ -65,6 +65,7 @@ export default function DashboardMenu() {
         { id: 'tiers',       label: 'Tiers',              icon: Users,           path: '/tiers',              color: '#ec4899', grad: 'linear-gradient(135deg,#db2777,#ec4899)',  perm: 'TIERS' },
         { id: 'dossiers',    label: 'Dossiers',           icon: Briefcase,       path: '/dossiers',           color: '#2563eb', grad: 'linear-gradient(135deg,#1d4ed8,#2563eb)',  perm: 'DOSSIERS', multi: true },
         { id: 'suivi',       label: 'Suivi dossiers',     icon: ClipboardList,   path: '/suivi-dossiers',     color: '#0891b2', grad: 'linear-gradient(135deg,#0e7490,#0891b2)',  perm: 'DOSSIERS' },
+        { id: 'arrivees',    label: 'Arrivées navires',   icon: Anchor,          path: '/transport-arrivals', color: '#0369a1', grad: 'linear-gradient(135deg,#0c4a6e,#0369a1)',  perm: 'DOSSIERS' },
         { id: 'cotation',    label: 'Cotation',           icon: Layers,          path: '/cotations',          color: '#10b981', grad: 'linear-gradient(135deg,#059669,#10b981)',  perm: 'COTATIONS' },
         { id: 'ot',          label: 'Ordre de Transit',   icon: FileText,        path: '/ordres-transit',     color: '#f97316', grad: 'linear-gradient(135deg,#ea580c,#f97316)',  perm: 'DOSSIERS' },
         { id: 'config-ot',   label: 'Configuration OT',   icon: Settings,        path: '/config-transit',     color: '#64748b', grad: 'linear-gradient(135deg,#475569,#64748b)',  perm: 'CONFIG',   multi: true },
