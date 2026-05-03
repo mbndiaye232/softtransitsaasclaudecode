@@ -51,7 +51,7 @@ router.get('/transport-arrivals', checkPermission('DOSSIERS', 'can_view'), async
 
         // Declarant (USER role) sees only dossiers assigned to them via declarations
         if (req.user.role === 'USER') {
-            query += ' AND EXISTS (SELECT 1 FROM declarations dec WHERE dec.IDDossiers = d.IDDossiers AND dec.IdAgent = ?)';
+            query += ' AND EXISTS (SELECT 1 FROM declarations decl WHERE decl.IDDossiers = d.IDDossiers AND decl.IdAgent = ?)';
             params.push(req.user.id);
         }
 
