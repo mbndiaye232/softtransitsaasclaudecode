@@ -207,6 +207,14 @@ router.post('/login', async (req, res) => {
             (user.function || '').toLowerCase().includes('clarant')
         );
 
+        const gn = (user.group_name || '').toLowerCase();
+        const fn = (user.function || '').toLowerCase();
+        const isResponsable = (
+            gn.includes('responsable') || fn.includes('responsable') ||
+            gn.includes('chef transit') || fn.includes('chef transit') ||
+            gn.includes('chef de transit') || fn.includes('chef de transit')
+        );
+
         res.json({
             message: 'Login successful',
             token,
@@ -221,7 +229,8 @@ router.post('/login', async (req, res) => {
                 two_factor_enabled: user.two_factor_enabled,
                 group_name: user.group_name,
                 function: user.function,
-                is_declarant: isDeclarant
+                is_declarant: isDeclarant,
+                is_responsable: isResponsable
             }
         });
 
@@ -267,6 +276,14 @@ router.get('/me', authMiddleware, async (req, res) => {
         u.is_declarant = u.role === 'USER' && (
             (u.group_name || '').toLowerCase().includes('clarant') ||
             (u.function || '').toLowerCase().includes('clarant')
+        );
+
+        const gn = (u.group_name || '').toLowerCase();
+        const fn = (u.function || '').toLowerCase();
+        u.is_responsable = (
+            gn.includes('responsable') || fn.includes('responsable') ||
+            gn.includes('chef transit') || fn.includes('chef transit') ||
+            gn.includes('chef de transit') || fn.includes('chef de transit')
         );
 
         res.json({ user: u });
