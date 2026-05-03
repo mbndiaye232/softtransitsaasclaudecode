@@ -26,7 +26,7 @@ const CATS = [
         label: 'Documents & Finance',
         color: '#059669',
         grad: 'linear-gradient(135deg,#064e3b,#059669)',
-        ids: ['finances'],
+        ids: ['finances', 'suivi-factures'],
     },
     {
         label: 'Outils & Administration',
@@ -72,6 +72,7 @@ export default function DashboardMenu() {
         { id: 'documents',   label: 'Gestion documents',  icon: FileText,        path: '/documents',          color: '#06b6d4', grad: 'linear-gradient(135deg,#0891b2,#06b6d4)',  perm: 'FACTURES' },
         { id: 'notes',       label: 'Note de détail',     icon: FileText,        path: '/notes',              color: '#3b82f6', grad: 'linear-gradient(135deg,#2563eb,#3b82f6)',  perm: 'NOTES' },
         { id: 'finances',    label: 'Etats financiers',   icon: BarChart3,       path: '/etats-financiers',   color: '#6366f1', grad: 'linear-gradient(135deg,#4338ca,#6366f1)',  perm: 'FACTURES', multi: true },
+        { id: 'suivi-factures', label: 'Suivi factures',  icon: FileText,        path: '/suivi-factures',     color: '#059669', grad: 'linear-gradient(135deg,#047857,#059669)',  perm: 'FACTURES' },
         { id: 'traitements', label: 'Suivi traitements',  icon: Layers,          path: '/suivi-traitements',  color: '#8b5cf6', grad: 'linear-gradient(135deg,#7c3aed,#8b5cf6)',  perm: 'DOSSIERS' },
         { id: 'dashboard',   label: 'Dashboard',          icon: LayoutDashboard, path: '/decision-dashboard', color: '#ec4899', grad: 'linear-gradient(135deg,#db2777,#ec4899)',  perm: null,       multi: true },
         { id: 'parametres',  label: 'Paramètres',         icon: Settings,        path: '/parameters-hub',     color: '#f59e0b', grad: 'linear-gradient(135deg,#d97706,#f59e0b)',  perm: 'CONFIG',   multi: true },
