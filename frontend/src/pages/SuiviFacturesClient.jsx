@@ -61,13 +61,17 @@ export default function SuiviFacturesClient() {
         }, {});
     }, [reglements]);
 
-    const enriched = useMemo(() => factures.map(f => {
-        const rs = reglementsByFacture[f.IDFactures] || [];
-        const ttc = Number(f.MontantTTCFacture || 0);
-        const regle = rs.reduce((s, r) => s + Number(r.MontantReglement || 0), 0);
-        const reliquat = Math.max(0, ttc - regle);
-        return { ...f, _reglements: rs, _ttc: ttc, _regle: regle, _reliquat: reliquat };
-    }), [factures, reglementsByFacture]);
+    // Only validated invoices are relevant for consultation: non-validated ones may
+    // be drafts or erroneous entries that were never cleaned up.
+    const enriched = useMemo(() => factures
+        .filter(f => Number(f.Validee) === 1)
+        .map(f => {
+            const rs = reglementsByFacture[f.IDFactures] || [];
+            const ttc = Number(f.MontantTTCFacture || 0);
+            const regle = rs.reduce((s, r) => s + Number(r.MontantReglement || 0), 0);
+            const reliquat = Math.max(0, ttc - regle);
+            return { ...f, _reglements: rs, _ttc: ttc, _regle: regle, _reliquat: reliquat };
+        }), [factures, reglementsByFacture]);
 
     const filtered = useMemo(() => {
         if (filter === FILTERS.UNPAID) return enriched.filter(f => f._reliquat > 0);
