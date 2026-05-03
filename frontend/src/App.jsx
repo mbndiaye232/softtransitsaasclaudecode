@@ -52,6 +52,7 @@ import UnitesVolumePage from './pages/UnitesVolumePage'
 import RegimesDeclarationPage from './pages/RegimesDeclarationPage'
 import CouleursPage from './pages/CouleursPage'
 import ReglementsPage from './pages/ReglementsPage'
+import SuiviFacturesClient from './pages/SuiviFacturesClient'
 import CancellationManager from './pages/CancellationManager'
 import TransportArrivals from './pages/TransportArrivals'
 
@@ -114,6 +115,7 @@ function AppRoutes() {
             <Route path="/parameters-hub" element={<ProtectedWithBilling><SettingsHub /></ProtectedWithBilling>} />
             <Route path="/etats-financiers" element={<ProtectedWithBilling><EtatsFinanciers /></ProtectedWithBilling>} />
             <Route path="/reglements" element={<ProtectedWithBilling><ReglementsPage /></ProtectedWithBilling>} />
+            <Route path="/suivi-factures" element={<ProtectedWithBilling><SuiviFacturesClient /></ProtectedWithBilling>} />
             <Route path="/reglements/cancellation" element={<ProtectedWithBilling><CancellationManager /></ProtectedWithBilling>} />
             <Route path="/suivi-dossiers" element={<ProtectedWithBilling><SuiviDossiers /></ProtectedWithBilling>} />
             <Route path="/documents" element={<ProtectedWithBilling><DocumentManager /></ProtectedWithBilling>} />
