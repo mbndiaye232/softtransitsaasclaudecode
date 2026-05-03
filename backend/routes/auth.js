@@ -150,7 +150,7 @@ router.post('/login', async (req, res) => {
 
         // Find user by login or email
         const [users] = await pool.query(
-            `SELECT 
+            `SELECT
         a.IDAgents as id,
         a.structur_id,
         a.NomAgent as name,
@@ -158,12 +158,15 @@ router.post('/login', async (req, res) => {
         a.Login as login,
         a.password_hash,
         a.role,
+        a.FonctionAgent as "function",
         a.is_active,
         a.two_factor_enabled,
+        g.LibelleGroupe as group_name,
         s.NomSociete as company_name,
         s.is_active as company_active
       FROM agents a
       JOIN structur s ON a.structur_id = s.IDSociete
+      LEFT JOIN groupes g ON a.IDGroupes = g.IDGroupes
       WHERE (a.Login = ? OR a.Email = ?)`,
             [login, login]
         );
@@ -199,6 +202,11 @@ router.post('/login', async (req, res) => {
         // Generate token
         const token = generateToken(user.id, user.structur_id, user.role);
 
+        const isDeclarant = user.role === 'USER' && (
+            (user.group_name || '').toLowerCase().includes('clarant') ||
+            (user.function || '').toLowerCase().includes('clarant')
+        );
+
         res.json({
             message: 'Login successful',
             token,
@@ -210,7 +218,10 @@ router.post('/login', async (req, res) => {
                 role: user.role,
                 structur_id: user.structur_id,
                 company_name: user.company_name,
-                two_factor_enabled: user.two_factor_enabled
+                two_factor_enabled: user.two_factor_enabled,
+                group_name: user.group_name,
+                function: user.function,
+                is_declarant: isDeclarant
             }
         });
 
@@ -227,7 +238,7 @@ router.post('/login', async (req, res) => {
 router.get('/me', authMiddleware, async (req, res) => {
     try {
         const [users] = await pool.query(
-            `SELECT 
+            `SELECT
         a.IDAgents as id,
         a.structur_id,
         a.NomAgent as name,
@@ -237,11 +248,13 @@ router.get('/me', authMiddleware, async (req, res) => {
         a.FonctionAgent as "function",
         a.Tel as phone,
         a.two_factor_enabled,
+        g.LibelleGroupe as group_name,
         s.NomSociete as company_name,
         s.credit_balance,
         s.Emailstructur as company_email
       FROM agents a
       JOIN structur s ON a.structur_id = s.IDSociete
+      LEFT JOIN groupes g ON a.IDGroupes = g.IDGroupes
       WHERE a.IDAgents = ?`,
             [req.user.id]
         );
@@ -250,7 +263,13 @@ router.get('/me', authMiddleware, async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        res.json({ user: users[0] });
+        const u = users[0];
+        u.is_declarant = u.role === 'USER' && (
+            (u.group_name || '').toLowerCase().includes('clarant') ||
+            (u.function || '').toLowerCase().includes('clarant')
+        );
+
+        res.json({ user: u });
 
     } catch (error) {
         console.error('Get user error:', error);

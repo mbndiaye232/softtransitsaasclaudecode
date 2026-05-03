@@ -3,11 +3,14 @@ import { useAuth } from '../context/AuthContext'
 import { useBilling } from '../context/BillingContext'
 import { useNavigate } from 'react-router-dom'
 import DashboardMenu from './DashboardMenu'
+import DeclarantArrivalsModal from '../components/DeclarantArrivalsModal'
 import { statisticsAPI, dashboardsAPI } from '../services/api'
 import {
     CreditCard, Briefcase, Clock, Users, LogOut,
     Building2, Mail, User, ShieldCheck, Sparkles, Zap, Anchor, ArrowRight
 } from 'lucide-react'
+
+const SESSION_FLAG = 'declarant_arrivals_seen'
 
 export default function Dashboard() {
     const { user, logout } = useAuth()
@@ -20,6 +23,7 @@ export default function Dashboard() {
         activeTeam: 0,
     })
     const [arrivals, setArrivals] = useState([])
+    const [showArrivalsModal, setShowArrivalsModal] = useState(false)
 
     useEffect(() => {
         refreshBilling()
@@ -35,13 +39,25 @@ export default function Dashboard() {
             try {
                 const response = await dashboardsAPI.getTransportArrivals()
                 setArrivals(response.data)
+                if (
+                    user?.is_declarant &&
+                    response.data.length > 0 &&
+                    !sessionStorage.getItem(SESSION_FLAG)
+                ) {
+                    setShowArrivalsModal(true)
+                }
             } catch (err) {
                 console.error('Error fetching arrivals:', err)
             }
         }
         fetchStats()
         fetchArrivals()
-    }, [])
+    }, [user?.is_declarant])
+
+    const closeArrivalsModal = () => {
+        sessionStorage.setItem(SESSION_FLAG, '1')
+        setShowArrivalsModal(false)
+    }
 
     const handleLogout = () => { logout(); navigate('/login') }
 
@@ -79,6 +95,9 @@ export default function Dashboard() {
 
     return (
         <div style={{ minHeight: '100vh', background: '#f1f5f9' }}>
+            {showArrivalsModal && (
+                <DeclarantArrivalsModal arrivals={arrivals} onClose={closeArrivalsModal} />
+            )}
             <style>{`
                 @keyframes pulse-orb {
                     0%, 100% { opacity: 0.5; transform: scale(1); }
