@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { dossiersAPI, clientsAPI, authAPI, documentsAPI } from '../services/api';
 import CotationManager from '../components/dossiers/CotationManager';
 import OrdreTransitManager from '../components/dossiers/OrdreTransitManager';
@@ -50,6 +51,7 @@ const MetaBadge = ({ icon, label, color = '#fff', opacity = 0.8 }) => (
 const DossierEdit = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { canView } = useAuth();
     const [loading, setLoading]       = useState(true);
     const [clients, setClients]       = useState([]);
     const [currentUser, setCurrentUser] = useState(null);
@@ -69,24 +71,32 @@ const DossierEdit = () => {
     const [error, setError]       = useState(null);
     const [activeTab, setActiveTab] = useState('detail');
 
-    const tabs = [
-        { id: 'detail',             label: 'Détails',        icon: <Info size={13} /> },
-        { id: 'cotation',           label: 'Cotation',       icon: <Briefcase size={13} /> },
-        { id: 'ot',                 label: 'OT (Transit)',   icon: <FileText size={13} /> },
-        { id: 'titre_transport',    label: 'TT (Titre)',     icon: <FileText size={13} /> },
-        { id: 'transport',          label: 'Transports',     icon: <LinkIcon size={13} /> },
-        { id: 'composition',        label: 'Composition',    icon: <Package size={13} /> },
-        { id: 'notes_detail',       label: 'Notes de détail',icon: <FileSearch size={13} />, navigate: true },
-        { id: 'declaration',        label: 'Déclaration',    icon: <Shield size={13} /> },
-        { id: 'mise_livraison',     label: 'Mise en Liv.',   icon: <Truck size={13} /> },
-        { id: 'ordre-transport',    label: 'OTR (Transp.)',  icon: <Truck size={13} /> },
-        { id: 'bordereau_livraison',label: 'BL (Bordereau)', icon: <FileText size={13} /> },
-        { id: 'devis',              label: 'Devis',          icon: <FileCheck2 size={13} /> },
-        { id: 'factures_tiers',     label: 'Factures Tiers', icon: <Building2 size={13} /> },
-        { id: 'facturation',        label: 'Facturation',    icon: <CreditCard size={13} /> },
-        { id: 'envoi_factures',     label: 'Envoi Factures', icon: <Mail size={13} /> },
-        { id: 'reglements',         label: 'Règlements',     icon: <CheckCircle size={13} /> },
+    const allTabs = [
+        { id: 'detail',             label: 'Détails',         icon: <Info size={13} />,        perm: 'DOSSIER_DETAILS' },
+        { id: 'cotation',           label: 'Cotation',        icon: <Briefcase size={13} />,   perm: 'DOSSIER_COTATION' },
+        { id: 'ot',                 label: 'OT (Transit)',    icon: <FileText size={13} />,    perm: 'DOSSIER_OT' },
+        { id: 'titre_transport',    label: 'TT (Titre)',      icon: <FileText size={13} />,    perm: 'DOSSIER_TT' },
+        { id: 'transport',          label: 'Transports',      icon: <LinkIcon size={13} />,    perm: 'DOSSIER_TRANSPORTS' },
+        { id: 'composition',        label: 'Composition',     icon: <Package size={13} />,     perm: 'DOSSIER_COMPOSITION' },
+        { id: 'notes_detail',       label: 'Notes de détail', icon: <FileSearch size={13} />,  perm: 'DOSSIER_NOTES',     navigate: true },
+        { id: 'declaration',        label: 'Déclaration',     icon: <Shield size={13} />,      perm: 'DOSSIER_DECLARATION' },
+        { id: 'mise_livraison',     label: 'Mise en Liv.',    icon: <Truck size={13} />,       perm: 'DOSSIER_LIVRAISON' },
+        { id: 'ordre-transport',    label: 'OTR (Transp.)',   icon: <Truck size={13} />,       perm: 'DOSSIER_OTR' },
+        { id: 'bordereau_livraison',label: 'BL (Bordereau)',  icon: <FileText size={13} />,    perm: 'DOSSIER_BL' },
+        { id: 'devis',              label: 'Devis',           icon: <FileCheck2 size={13} />,  perm: 'DOSSIER_DEVIS' },
+        { id: 'factures_tiers',     label: 'Factures Tiers',  icon: <Building2 size={13} />,   perm: 'DOSSIER_FACTURES_TIERS' },
+        { id: 'facturation',        label: 'Facturation',     icon: <CreditCard size={13} />,  perm: 'DOSSIER_FACTURATION' },
+        { id: 'envoi_factures',     label: 'Envoi Factures',  icon: <Mail size={13} />,        perm: 'DOSSIER_ENVOI_FACTURES' },
+        { id: 'reglements',         label: 'Règlements',      icon: <CheckCircle size={13} />, perm: 'DOSSIER_REGLEMENTS' },
     ];
+    const tabs = allTabs.filter(t => canView(t.perm));
+
+    // Si l'onglet actif n'est plus visible (permissions changées), se repositionner sur le premier visible
+    useEffect(() => {
+        if (tabs.length > 0 && !tabs.find(t => t.id === activeTab)) {
+            setActiveTab(tabs[0].id)
+        }
+    }, [tabs.length]) // eslint-disable-line
 
     useEffect(() => {
         const fetchData = async () => {

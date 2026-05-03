@@ -3,9 +3,31 @@ const GROUPS = [
         label: 'Dossiers & Transit',
         color: '#0369a1',
         modules: [
-            { code: 'DOSSIERS',  label: 'Gestion des Dossiers' },
+            { code: 'DOSSIERS',  label: 'Gestion des Dossiers (liste, création)' },
             { code: 'COTATIONS', label: 'Gestion des Cotations' },
             { code: 'NOTES',     label: 'Notes de Détails' },
+        ]
+    },
+    {
+        label: 'Onglets du Dossier',
+        color: '#0284c7',
+        modules: [
+            { code: 'DOSSIER_DETAILS',        label: '↳ Onglet — Détails' },
+            { code: 'DOSSIER_COTATION',        label: '↳ Onglet — Cotation' },
+            { code: 'DOSSIER_OT',              label: '↳ Onglet — OT (Transit)' },
+            { code: 'DOSSIER_TT',              label: '↳ Onglet — TT (Titre Transport)' },
+            { code: 'DOSSIER_TRANSPORTS',      label: '↳ Onglet — Transports' },
+            { code: 'DOSSIER_COMPOSITION',     label: '↳ Onglet — Composition' },
+            { code: 'DOSSIER_NOTES',           label: '↳ Onglet — Notes de détail' },
+            { code: 'DOSSIER_DECLARATION',     label: '↳ Onglet — Déclaration' },
+            { code: 'DOSSIER_LIVRAISON',       label: '↳ Onglet — Mise en Livraison' },
+            { code: 'DOSSIER_OTR',             label: '↳ Onglet — OTR (Transp.)' },
+            { code: 'DOSSIER_BL',              label: '↳ Onglet — BL (Bordereau)' },
+            { code: 'DOSSIER_DEVIS',           label: '↳ Onglet — Devis' },
+            { code: 'DOSSIER_FACTURES_TIERS',  label: '↳ Onglet — Factures Tiers' },
+            { code: 'DOSSIER_FACTURATION',     label: '↳ Onglet — Facturation' },
+            { code: 'DOSSIER_ENVOI_FACTURES',  label: '↳ Onglet — Envoi Factures' },
+            { code: 'DOSSIER_REGLEMENTS',      label: '↳ Onglet — Règlements' },
         ]
     },
     {
