@@ -4,6 +4,7 @@ import { useBilling } from '../context/BillingContext'
 import { useNavigate } from 'react-router-dom'
 import DashboardMenu from './DashboardMenu'
 import DeclarantArrivalsModal from '../components/DeclarantArrivalsModal'
+import TrackingModal from '../components/TrackingModal'
 import { statisticsAPI, dashboardsAPI } from '../services/api'
 import {
     CreditCard, Briefcase, Clock, Users, LogOut,
@@ -11,6 +12,7 @@ import {
 } from 'lucide-react'
 
 const SESSION_FLAG = 'declarant_arrivals_seen'
+const SESSION_TRACKING_FLAG = 'tracking_seen'
 
 export default function Dashboard() {
     const { user, logout } = useAuth()
@@ -24,6 +26,8 @@ export default function Dashboard() {
     })
     const [arrivals, setArrivals] = useState([])
     const [showArrivalsModal, setShowArrivalsModal] = useState(false)
+    const [trackingDossiers, setTrackingDossiers] = useState([])
+    const [showTrackingModal, setShowTrackingModal] = useState(false)
 
     useEffect(() => {
         refreshBilling()
@@ -50,13 +54,34 @@ export default function Dashboard() {
                 console.error('Error fetching arrivals:', err)
             }
         }
+        const fetchTracking = async () => {
+            try {
+                const response = await dashboardsAPI.getDossierTracking()
+                setTrackingDossiers(response.data)
+                if (
+                    user?.is_responsable &&
+                    response.data.length > 0 &&
+                    !sessionStorage.getItem(SESSION_TRACKING_FLAG)
+                ) {
+                    setShowTrackingModal(true)
+                }
+            } catch (err) {
+                console.error('Error fetching tracking:', err)
+            }
+        }
         fetchStats()
         fetchArrivals()
-    }, [user?.is_declarant])
+        if (user?.is_responsable) fetchTracking()
+    }, [user?.is_declarant, user?.is_responsable])
 
     const closeArrivalsModal = () => {
         sessionStorage.setItem(SESSION_FLAG, '1')
         setShowArrivalsModal(false)
+    }
+
+    const closeTrackingModal = () => {
+        sessionStorage.setItem(SESSION_TRACKING_FLAG, '1')
+        setShowTrackingModal(false)
     }
 
     const handleLogout = () => { logout(); navigate('/login') }
@@ -97,6 +122,9 @@ export default function Dashboard() {
         <div style={{ minHeight: '100vh', background: '#f1f5f9' }}>
             {showArrivalsModal && (
                 <DeclarantArrivalsModal arrivals={arrivals} onClose={closeArrivalsModal} />
+            )}
+            {showTrackingModal && (
+                <TrackingModal dossiers={trackingDossiers} onClose={closeTrackingModal} />
             )}
             <style>{`
                 @keyframes pulse-orb {
