@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Settings, LogOut, ChevronLeft, Menu, X, CreditCard } from 'lucide-react';
+import { Home, Settings, LogOut, ChevronLeft, Menu, X, CreditCard, FileText } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import logoSST from '../assets/icone-soft-transit.svg';
 
@@ -200,6 +200,9 @@ export default function FloatingNav() {
                 </button>
                 <button className="fnav-btn" onClick={() => navigate('/reglements')}>
                     <CreditCard size={16} /> Règlements
+                </button>
+                <button className="fnav-btn" onClick={() => navigate('/suivi-factures')}>
+                    <FileText size={16} /> Suivi factures
                 </button>
                 <button className="fnav-btn" onClick={() => navigate('/parameters-hub')}>
                     <Settings size={16} /> Paramètres
