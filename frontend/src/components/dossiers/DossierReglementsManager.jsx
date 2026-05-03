@@ -12,7 +12,7 @@ export default function DossierReglementsManager({ dossierId }) {
     const [loading, setLoading]         = useState(true);
     const [error, setError]             = useState(null);
     const [showForm, setShowForm]       = useState(false);
-    const [selectedFactures, setSelectedFactures] = useState([]);
+    const [selectedFacture, setSelectedFacture] = useState(null);
     const [montant, setMontant]         = useState('');
     const [date, setDate]               = useState(new Date().toISOString().split('T')[0]);
     const [mode, setMode]               = useState('');
@@ -63,13 +63,8 @@ export default function DossierReglementsManager({ dossierId }) {
     const getReliquat = (f) => Math.max(0, Number(f.MontantTTCFacture || 0) - getRegle(f));
 
     const unpaidFactures = factures.filter(f => getReliquat(f) > 0 && Number(f.Validee) === 1);
-    const totalSelected  = unpaidFactures
-        .filter(f => selectedFactures.includes(f.IDFactures))
-        .reduce((s, f) => s + getReliquat(f), 0);
-
-    const toggleFacture = (id) => setSelectedFactures(prev =>
-        prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+    const selectedFactureObj = unpaidFactures.find(f => f.IDFactures === selectedFacture);
+    const totalSelected = selectedFactureObj ? getReliquat(selectedFactureObj) : 0;
 
     const showMsg = (text, type = 'info') => {
         setMsg({ text, type });
@@ -94,7 +89,7 @@ export default function DossierReglementsManager({ dossierId }) {
     };
 
     const handleSubmit = async () => {
-        if (selectedFactures.length === 0) return showMsg('Sélectionnez au moins une facture.', 'error');
+        if (!selectedFacture) return showMsg('Sélectionnez une facture.', 'error');
         const m = parseFloat(montant);
         if (!m || m <= 0) return showMsg('Montant invalide.', 'error');
         if (!mode) return showMsg('Choisissez un mode de règlement.', 'error');
@@ -104,13 +99,13 @@ export default function DossierReglementsManager({ dossierId }) {
                 clientId,
                 montantReglement: m,
                 dateReglement: date,
-                listFactures: selectedFactures,
+                listFactures: [selectedFacture],
                 idModeReglement: mode,
                 observations,
             });
             showMsg('Règlement enregistré avec succès.', 'success');
             setShowForm(false);
-            setSelectedFactures([]);
+            setSelectedFacture(null);
             setMontant('');
             setObservations('');
             await load();
@@ -178,14 +173,14 @@ export default function DossierReglementsManager({ dossierId }) {
                     </div>
                     <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
                         <div>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 8, textTransform: 'uppercase' }}>Factures à régler *</div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 8, textTransform: 'uppercase' }}>Facture à régler *</div>
                             {unpaidFactures.length === 0 ? (
                                 <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, color: '#94a3b8', fontSize: 13 }}>Toutes les factures sont soldées.</div>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                     {unpaidFactures.map(f => (
-                                        <label key={f.IDFactures} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, border: `2px solid ${selectedFactures.includes(f.IDFactures) ? '#b45309' : '#e5e7eb'}`, cursor: 'pointer', background: selectedFactures.includes(f.IDFactures) ? '#fff7ed' : 'white' }}>
-                                            <input type="checkbox" checked={selectedFactures.includes(f.IDFactures)} onChange={() => toggleFacture(f.IDFactures)} style={{ accentColor: '#b45309', width: 16, height: 16 }} />
+                                        <label key={f.IDFactures} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, border: `2px solid ${selectedFacture === f.IDFactures ? '#b45309' : '#e5e7eb'}`, cursor: 'pointer', background: selectedFacture === f.IDFactures ? '#fff7ed' : 'white' }}>
+                                            <input type="radio" name="facture-a-regler" checked={selectedFacture === f.IDFactures} onChange={() => setSelectedFacture(f.IDFactures)} style={{ accentColor: '#b45309', width: 16, height: 16 }} />
                                             <span style={{ fontWeight: 700, color: '#1e293b', flex: 1 }}>{f.NumeroFacture}</span>
                                             <span style={{ fontSize: 12, color: '#64748b' }}>Reliquat :</span>
                                             <span style={{ fontWeight: 800, color: '#dc2626' }}>{fmt(getReliquat(f))}</span>
@@ -195,7 +190,7 @@ export default function DossierReglementsManager({ dossierId }) {
                             )}
                             {totalSelected > 0 && (
                                 <div style={{ marginTop: 8, fontSize: 12, color: '#b45309', fontWeight: 700 }}>
-                                    Total sélectionné : {fmt(totalSelected)}
+                                    Reliquat sélectionné : {fmt(totalSelected)}
                                     <button onClick={() => setMontant(totalSelected)} style={{ marginLeft: 10, fontSize: 11, fontWeight: 700, background: '#fff7ed', border: '1px solid #fed7aa', color: '#b45309', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>
                                         Remplir auto
                                     </button>
