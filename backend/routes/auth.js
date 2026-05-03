@@ -214,6 +214,12 @@ router.post('/login', async (req, res) => {
             gn.includes('chef transit') || fn.includes('chef transit') ||
             gn.includes('chef de transit') || fn.includes('chef de transit')
         );
+        const isDirecteur = (
+            gn.includes('directeur') || fn.includes('directeur') ||
+            gn.includes('directrice') || fn.includes('directrice') ||
+            gn.includes('daf') || fn.includes('daf') ||
+            gn.includes('dg') || fn.includes('dg')
+        );
 
         res.json({
             message: 'Login successful',
@@ -230,7 +236,8 @@ router.post('/login', async (req, res) => {
                 group_name: user.group_name,
                 function: user.function,
                 is_declarant: isDeclarant,
-                is_responsable: isResponsable
+                is_responsable: isResponsable,
+                is_directeur: isDirecteur
             }
         });
 
@@ -284,6 +291,12 @@ router.get('/me', authMiddleware, async (req, res) => {
             gn.includes('responsable') || fn.includes('responsable') ||
             gn.includes('chef transit') || fn.includes('chef transit') ||
             gn.includes('chef de transit') || fn.includes('chef de transit')
+        );
+        u.is_directeur = (
+            gn.includes('directeur') || fn.includes('directeur') ||
+            gn.includes('directrice') || fn.includes('directrice') ||
+            gn.includes('daf') || fn.includes('daf') ||
+            gn.includes('dg') || fn.includes('dg')
         );
 
         res.json({ user: u });

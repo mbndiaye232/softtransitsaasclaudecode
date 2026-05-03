@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import DashboardMenu from './DashboardMenu'
 import DeclarantArrivalsModal from '../components/DeclarantArrivalsModal'
 import TrackingModal from '../components/TrackingModal'
+import DirecteurModal from '../components/DirecteurModal'
 import { statisticsAPI, dashboardsAPI } from '../services/api'
 import {
     CreditCard, Briefcase, Clock, Users, LogOut,
@@ -13,6 +14,7 @@ import {
 
 const SESSION_FLAG = 'declarant_arrivals_seen'
 const SESSION_TRACKING_FLAG = 'tracking_seen'
+const SESSION_DIRECTEUR_FLAG = 'directeur_seen'
 
 export default function Dashboard() {
     const { user, logout } = useAuth()
@@ -28,6 +30,7 @@ export default function Dashboard() {
     const [showArrivalsModal, setShowArrivalsModal] = useState(false)
     const [trackingDossiers, setTrackingDossiers] = useState([])
     const [showTrackingModal, setShowTrackingModal] = useState(false)
+    const [showDirecteurModal, setShowDirecteurModal] = useState(false)
 
     useEffect(() => {
         refreshBilling()
@@ -72,7 +75,10 @@ export default function Dashboard() {
         fetchStats()
         fetchArrivals()
         if (user?.is_responsable) fetchTracking()
-    }, [user?.is_declarant, user?.is_responsable])
+        if (user?.is_directeur && !sessionStorage.getItem(SESSION_DIRECTEUR_FLAG)) {
+            setShowDirecteurModal(true)
+        }
+    }, [user?.is_declarant, user?.is_responsable, user?.is_directeur])
 
     const closeArrivalsModal = () => {
         sessionStorage.setItem(SESSION_FLAG, '1')
@@ -82,6 +88,11 @@ export default function Dashboard() {
     const closeTrackingModal = () => {
         sessionStorage.setItem(SESSION_TRACKING_FLAG, '1')
         setShowTrackingModal(false)
+    }
+
+    const closeDirecteurModal = () => {
+        sessionStorage.setItem(SESSION_DIRECTEUR_FLAG, '1')
+        setShowDirecteurModal(false)
     }
 
     const handleLogout = () => { logout(); navigate('/login') }
@@ -125,6 +136,9 @@ export default function Dashboard() {
             )}
             {showTrackingModal && (
                 <TrackingModal dossiers={trackingDossiers} onClose={closeTrackingModal} />
+            )}
+            {showDirecteurModal && (
+                <DirecteurModal onClose={closeDirecteurModal} />
             )}
             <style>{`
                 @keyframes pulse-orb {
