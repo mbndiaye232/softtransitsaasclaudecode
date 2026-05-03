@@ -214,6 +214,10 @@ router.post('/login', async (req, res) => {
             gn.includes('chef transit') || fn.includes('chef transit') ||
             gn.includes('chef de transit') || fn.includes('chef de transit')
         );
+        const isFacturier = (
+            gn.includes('facturier') || fn.includes('facturier') ||
+            gn.includes('facturation') || fn.includes('facturation')
+        );
         const isDirecteur = (
             gn.includes('directeur') || fn.includes('directeur') ||
             gn.includes('directrice') || fn.includes('directrice') ||
@@ -237,6 +241,7 @@ router.post('/login', async (req, res) => {
                 function: user.function,
                 is_declarant: isDeclarant,
                 is_responsable: isResponsable,
+                is_facturier: isFacturier,
                 is_directeur: isDirecteur
             }
         });
@@ -291,6 +296,10 @@ router.get('/me', authMiddleware, async (req, res) => {
             gn.includes('responsable') || fn.includes('responsable') ||
             gn.includes('chef transit') || fn.includes('chef transit') ||
             gn.includes('chef de transit') || fn.includes('chef de transit')
+        );
+        u.is_facturier = (
+            gn.includes('facturier') || fn.includes('facturier') ||
+            gn.includes('facturation') || fn.includes('facturation')
         );
         u.is_directeur = (
             gn.includes('directeur') || fn.includes('directeur') ||

@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import DashboardMenu from './DashboardMenu'
 import DeclarantArrivalsModal from '../components/DeclarantArrivalsModal'
 import TrackingModal from '../components/TrackingModal'
+import FacturierModal from '../components/FacturierModal'
 import DirecteurModal from '../components/DirecteurModal'
 import { statisticsAPI, dashboardsAPI } from '../services/api'
 import {
@@ -14,6 +15,7 @@ import {
 
 const SESSION_FLAG = 'declarant_arrivals_seen'
 const SESSION_TRACKING_FLAG = 'tracking_seen'
+const SESSION_FACTURIER_FLAG = 'facturier_seen'
 const SESSION_DIRECTEUR_FLAG = 'directeur_seen'
 
 export default function Dashboard() {
@@ -30,6 +32,8 @@ export default function Dashboard() {
     const [showArrivalsModal, setShowArrivalsModal] = useState(false)
     const [trackingDossiers, setTrackingDossiers] = useState([])
     const [showTrackingModal, setShowTrackingModal] = useState(false)
+    const [toInvoiceDossiers, setToInvoiceDossiers] = useState([])
+    const [showFacturierModal, setShowFacturierModal] = useState(false)
     const [showDirecteurModal, setShowDirecteurModal] = useState(false)
 
     useEffect(() => {
@@ -72,13 +76,29 @@ export default function Dashboard() {
                 console.error('Error fetching tracking:', err)
             }
         }
+        const fetchToInvoice = async () => {
+            try {
+                const response = await dashboardsAPI.getToInvoice()
+                setToInvoiceDossiers(response.data)
+                if (
+                    user?.is_facturier &&
+                    response.data.length > 0 &&
+                    !sessionStorage.getItem(SESSION_FACTURIER_FLAG)
+                ) {
+                    setShowFacturierModal(true)
+                }
+            } catch (err) {
+                console.error('Error fetching to-invoice dossiers:', err)
+            }
+        }
         fetchStats()
         fetchArrivals()
         if (user?.is_responsable) fetchTracking()
+        if (user?.is_facturier) fetchToInvoice()
         if (user?.is_directeur && !sessionStorage.getItem(SESSION_DIRECTEUR_FLAG)) {
             setShowDirecteurModal(true)
         }
-    }, [user?.is_declarant, user?.is_responsable, user?.is_directeur])
+    }, [user?.is_declarant, user?.is_responsable, user?.is_facturier, user?.is_directeur])
 
     const closeArrivalsModal = () => {
         sessionStorage.setItem(SESSION_FLAG, '1')
@@ -88,6 +108,11 @@ export default function Dashboard() {
     const closeTrackingModal = () => {
         sessionStorage.setItem(SESSION_TRACKING_FLAG, '1')
         setShowTrackingModal(false)
+    }
+
+    const closeFacturierModal = () => {
+        sessionStorage.setItem(SESSION_FACTURIER_FLAG, '1')
+        setShowFacturierModal(false)
     }
 
     const closeDirecteurModal = () => {
@@ -136,6 +161,9 @@ export default function Dashboard() {
             )}
             {showTrackingModal && (
                 <TrackingModal dossiers={trackingDossiers} onClose={closeTrackingModal} />
+            )}
+            {showFacturierModal && (
+                <FacturierModal dossiers={toInvoiceDossiers} onClose={closeFacturierModal} />
             )}
             {showDirecteurModal && (
                 <DirecteurModal onClose={closeDirecteurModal} />

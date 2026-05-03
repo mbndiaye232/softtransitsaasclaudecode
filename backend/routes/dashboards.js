@@ -339,4 +339,49 @@ router.get('/dossier-trends', checkPermission('DOSSIERS', 'can_view'), async (re
     }
 });
 
+/**
+ * GET /api/dashboards/to-invoice
+ * Dossiers at "livré" step with no validated invoice yet
+ */
+router.get('/to-invoice', checkPermission('FACTURES', 'can_view'), async (req, res) => {
+    try {
+        let query = `
+            SELECT
+                d.IDDossiers as id,
+                d.CodeDossier as code,
+                d.Libelle as label,
+                cl.NomRS as clientName,
+                cl.TelClient as clientPhone,
+                e.libelleEtapesDossiers as step,
+                ml.DateEffectiveLivraison as dateLivraison,
+                t.NumeroTitreTransport as docNumber
+            FROM dossiers d
+            JOIN clients cl ON d.IDCLIENTS = cl.IDCLIENTS
+            JOIN etapesdossiers e ON d.IdEtapeDossiers = e.IDEtapesDossiers
+            LEFT JOIN miseenlivraison ml ON d.IDDossiers = ml.IDDossiers
+            LEFT JOIN transports t ON d.IDDossiers = t.idbl OR d.IDDossiers = t.IdAgent
+            WHERE (d.Facturable IS NULL OR d.Facturable != -1)
+              AND LOWER(e.libelleEtapesDossiers) LIKE '%livr%'
+              AND NOT EXISTS (
+                  SELECT 1 FROM factures f
+                  WHERE f.IDDossiers = d.IDDossiers AND f.Validee = 1
+              )
+        `;
+        let params = [];
+
+        if (!req.is_viewing_all) {
+            query += ' AND d.structur_id = ?';
+            params.push(req.structur_id);
+        }
+
+        query += ' GROUP BY d.IDDossiers ORDER BY ml.DateEffectiveLivraison ASC';
+
+        const [rows] = await pool.query(query, params);
+        res.json(rows);
+    } catch (err) {
+        console.error('Error fetching to-invoice dossiers:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 module.exports = router;

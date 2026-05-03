@@ -238,7 +238,8 @@ export const dashboardsAPI = {
     getTopEncours: () => api.get('/dashboards/top-encours'),
     getAgingBalance: () => api.get('/dashboards/aging-balance'),
     getPerformanceTrends: () => api.get('/dashboards/performance-trends'),
-    getDossierTrends: () => api.get('/dashboards/dossier-trends')
+    getDossierTrends: () => api.get('/dashboards/dossier-trends'),
+    getToInvoice: () => api.get('/dashboards/to-invoice')
 };
 
 export const declarationsAPI = {
