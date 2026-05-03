@@ -6,6 +6,7 @@ import DashboardMenu from './DashboardMenu'
 import DeclarantArrivalsModal from '../components/DeclarantArrivalsModal'
 import TrackingModal from '../components/TrackingModal'
 import FacturierModal from '../components/FacturierModal'
+import DirecteurModal from '../components/DirecteurModal'
 import { statisticsAPI, dashboardsAPI } from '../services/api'
 import {
     CreditCard, Briefcase, Clock, Users, LogOut,
@@ -15,6 +16,7 @@ import {
 const SESSION_FLAG = 'declarant_arrivals_seen'
 const SESSION_TRACKING_FLAG = 'tracking_seen'
 const SESSION_FACTURIER_FLAG = 'facturier_seen'
+const SESSION_DIRECTEUR_FLAG = 'directeur_seen'
 
 export default function Dashboard() {
     const { user, logout } = useAuth()
@@ -32,6 +34,7 @@ export default function Dashboard() {
     const [showTrackingModal, setShowTrackingModal] = useState(false)
     const [toInvoiceDossiers, setToInvoiceDossiers] = useState([])
     const [showFacturierModal, setShowFacturierModal] = useState(false)
+    const [showDirecteurModal, setShowDirecteurModal] = useState(false)
 
     useEffect(() => {
         refreshBilling()
@@ -92,7 +95,10 @@ export default function Dashboard() {
         fetchArrivals()
         if (user?.is_responsable) fetchTracking()
         if (user?.is_facturier) fetchToInvoice()
-    }, [user?.is_declarant, user?.is_responsable, user?.is_facturier])
+        if (user?.is_directeur && !sessionStorage.getItem(SESSION_DIRECTEUR_FLAG)) {
+            setShowDirecteurModal(true)
+        }
+    }, [user?.is_declarant, user?.is_responsable, user?.is_facturier, user?.is_directeur])
 
     const closeArrivalsModal = () => {
         sessionStorage.setItem(SESSION_FLAG, '1')
@@ -107,6 +113,11 @@ export default function Dashboard() {
     const closeFacturierModal = () => {
         sessionStorage.setItem(SESSION_FACTURIER_FLAG, '1')
         setShowFacturierModal(false)
+    }
+
+    const closeDirecteurModal = () => {
+        sessionStorage.setItem(SESSION_DIRECTEUR_FLAG, '1')
+        setShowDirecteurModal(false)
     }
 
     const handleLogout = () => { logout(); navigate('/login') }
@@ -153,6 +164,9 @@ export default function Dashboard() {
             )}
             {showFacturierModal && (
                 <FacturierModal dossiers={toInvoiceDossiers} onClose={closeFacturierModal} />
+            )}
+            {showDirecteurModal && (
+                <DirecteurModal onClose={closeDirecteurModal} />
             )}
             <style>{`
                 @keyframes pulse-orb {

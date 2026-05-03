@@ -218,6 +218,12 @@ router.post('/login', async (req, res) => {
             gn.includes('facturier') || fn.includes('facturier') ||
             gn.includes('facturation') || fn.includes('facturation')
         );
+        const isDirecteur = (
+            gn.includes('directeur') || fn.includes('directeur') ||
+            gn.includes('directrice') || fn.includes('directrice') ||
+            gn.includes('daf') || fn.includes('daf') ||
+            gn.includes('dg') || fn.includes('dg')
+        );
 
         res.json({
             message: 'Login successful',
@@ -235,7 +241,8 @@ router.post('/login', async (req, res) => {
                 function: user.function,
                 is_declarant: isDeclarant,
                 is_responsable: isResponsable,
-                is_facturier: isFacturier
+                is_facturier: isFacturier,
+                is_directeur: isDirecteur
             }
         });
 
@@ -293,6 +300,12 @@ router.get('/me', authMiddleware, async (req, res) => {
         u.is_facturier = (
             gn.includes('facturier') || fn.includes('facturier') ||
             gn.includes('facturation') || fn.includes('facturation')
+        );
+        u.is_directeur = (
+            gn.includes('directeur') || fn.includes('directeur') ||
+            gn.includes('directrice') || fn.includes('directrice') ||
+            gn.includes('daf') || fn.includes('daf') ||
+            gn.includes('dg') || fn.includes('dg')
         );
 
         res.json({ user: u });
