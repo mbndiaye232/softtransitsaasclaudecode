@@ -52,10 +52,20 @@ export default function DossierReglementsManager({ dossierId }) {
 
     useEffect(() => { load(); }, [dossierId]);
 
-    const unpaidFactures = factures.filter(f => Number(f.ReliquatFacture || 0) > 0 && Number(f.Validee) === 1);
+    // Compute Réglé per facture from the reglements table (source of truth)
+    // rather than relying on the cached factures.MontantRegleFacture column,
+    // which can drift after manual edits, imports, or partial updates.
+    const regleByFacture = reglements.reduce((acc, r) => {
+        acc[r.IDFactures] = (acc[r.IDFactures] || 0) + Number(r.MontantReglement || 0);
+        return acc;
+    }, {});
+    const getRegle = (f) => regleByFacture[f.IDFactures] ?? Number(f.MontantRegleFacture || 0);
+    const getReliquat = (f) => Math.max(0, Number(f.MontantTTCFacture || 0) - getRegle(f));
+
+    const unpaidFactures = factures.filter(f => getReliquat(f) > 0 && Number(f.Validee) === 1);
     const totalSelected  = unpaidFactures
         .filter(f => selectedFactures.includes(f.IDFactures))
-        .reduce((s, f) => s + Number(f.ReliquatFacture || 0), 0);
+        .reduce((s, f) => s + getReliquat(f), 0);
 
     const toggleFacture = (id) => setSelectedFactures(prev =>
         prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
@@ -114,8 +124,8 @@ export default function DossierReglementsManager({ dossierId }) {
     const fmt = (n) => Number(n || 0).toLocaleString('fr-FR') + ' FCFA';
 
     const totalFacture = factures.reduce((s, f) => s + Number(f.MontantTTCFacture || 0), 0);
-    const totalRegle   = factures.reduce((s, f) => s + Number(f.MontantRegleFacture || 0), 0);
-    const reliquat     = totalFacture - totalRegle;
+    const totalRegle   = factures.reduce((s, f) => s + getRegle(f), 0);
+    const reliquat     = Math.max(0, totalFacture - totalRegle);
     const statusColor  = reliquat <= 0 ? '#16a34a' : reliquat < totalFacture ? '#d97706' : '#dc2626';
     const statusLabel  = reliquat <= 0 ? 'Soldé' : reliquat < totalFacture ? 'Partiel' : 'Impayé';
     const StatusIcon   = reliquat <= 0 ? CheckCircle : reliquat < totalFacture ? Clock : AlertCircle;
@@ -178,7 +188,7 @@ export default function DossierReglementsManager({ dossierId }) {
                                             <input type="checkbox" checked={selectedFactures.includes(f.IDFactures)} onChange={() => toggleFacture(f.IDFactures)} style={{ accentColor: '#b45309', width: 16, height: 16 }} />
                                             <span style={{ fontWeight: 700, color: '#1e293b', flex: 1 }}>{f.NumeroFacture}</span>
                                             <span style={{ fontSize: 12, color: '#64748b' }}>Reliquat :</span>
-                                            <span style={{ fontWeight: 800, color: '#dc2626' }}>{fmt(f.ReliquatFacture)}</span>
+                                            <span style={{ fontWeight: 800, color: '#dc2626' }}>{fmt(getReliquat(f))}</span>
                                         </label>
                                     ))}
                                 </div>
@@ -259,9 +269,9 @@ export default function DossierReglementsManager({ dossierId }) {
                         </thead>
                         <tbody>
                             {factures.map(f => {
-                                const rel   = Number(f.ReliquatFacture || 0);
                                 const ttc   = Number(f.MontantTTCFacture || 0);
-                                const regle = Number(f.MontantRegleFacture || 0);
+                                const regle = getRegle(f);
+                                const rel   = getReliquat(f);
                                 const sc = rel <= 0 ? '#16a34a' : regle > 0 ? '#d97706' : '#dc2626';
                                 const sl = rel <= 0 ? 'Soldé' : regle > 0 ? 'Partiel' : 'Impayé';
                                 const isValidated = Number(f.Validee) === 1;
