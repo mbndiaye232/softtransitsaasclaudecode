@@ -214,6 +214,10 @@ router.post('/login', async (req, res) => {
             gn.includes('chef transit') || fn.includes('chef transit') ||
             gn.includes('chef de transit') || fn.includes('chef de transit')
         );
+        const isFacturier = (
+            gn.includes('facturier') || fn.includes('facturier') ||
+            gn.includes('facturation') || fn.includes('facturation')
+        );
 
         res.json({
             message: 'Login successful',
@@ -230,7 +234,8 @@ router.post('/login', async (req, res) => {
                 group_name: user.group_name,
                 function: user.function,
                 is_declarant: isDeclarant,
-                is_responsable: isResponsable
+                is_responsable: isResponsable,
+                is_facturier: isFacturier
             }
         });
 
@@ -284,6 +289,10 @@ router.get('/me', authMiddleware, async (req, res) => {
             gn.includes('responsable') || fn.includes('responsable') ||
             gn.includes('chef transit') || fn.includes('chef transit') ||
             gn.includes('chef de transit') || fn.includes('chef de transit')
+        );
+        u.is_facturier = (
+            gn.includes('facturier') || fn.includes('facturier') ||
+            gn.includes('facturation') || fn.includes('facturation')
         );
 
         res.json({ user: u });
