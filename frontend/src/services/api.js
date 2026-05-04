@@ -126,6 +126,7 @@ export const notesAPI = {
     // PDF Generation
     generatePDF: (noteId) => api.get(`/notes/${noteId}/generate-pdf`, { responseType: 'blob' }),
     validate: (noteId) => api.post(`/notes/${noteId}/validate`),
+    unvalidate: (noteId) => api.post(`/notes/${noteId}/unvalidate`),
     getPdfStatus: (noteId) => api.get(`/notes/${noteId}/pdf-status`)
 };
 
