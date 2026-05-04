@@ -334,6 +334,7 @@ export const transportsAPI = {
 export const moyensTransportAPI = {
     getAll: () => api.get('/moyens-transport'),
     getOne: (id) => api.get(`/moyens-transport/${id}`),
+    getTypes: () => api.get('/moyens-transport/types'),
     create: (data) => api.post('/moyens-transport', data),
     update: (id, data) => api.put(`/moyens-transport/${id}`, data),
     delete: (id) => api.delete(`/moyens-transport/${id}`)
