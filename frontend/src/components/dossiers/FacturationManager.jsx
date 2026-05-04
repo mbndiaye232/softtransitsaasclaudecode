@@ -698,7 +698,7 @@ const FacturationManager = ({ dossierId }) => {
                     </div>
                 </div>
 
-                <div className="fm-sidebar-section" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexSide: 'column' }}>
+                <div className="fm-sidebar-section" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                     <span className="fm-section-label">Historique</span>
                     <div className="fm-history-list" style={{ overflowY: 'auto' }}>
                         {invoices.length === 0 ? (

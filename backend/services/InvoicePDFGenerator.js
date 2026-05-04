@@ -15,7 +15,7 @@ class InvoicePDFGenerator {
         // 2. Create PDF (A4 Portrait)
         const doc = new PDFDocument({
             size: 'A4',
-            margins: { top: 30, bottom: 50, left: 40, right: 40 },
+            margins: { top: 30, bottom: 30, left: 40, right: 40 },
             bufferPages: true
         });
 
