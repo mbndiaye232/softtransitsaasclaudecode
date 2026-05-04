@@ -61,8 +61,6 @@ export default function SuiviFacturesClient() {
         }, {});
     }, [reglements]);
 
-    // Only validated invoices are relevant for consultation: non-validated ones may
-    // be drafts or erroneous entries that were never cleaned up.
     const enriched = useMemo(() => factures
         .filter(f => Number(f.Validee) === 1)
         .map(f => {
