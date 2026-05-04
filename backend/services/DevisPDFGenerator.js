@@ -15,7 +15,7 @@ class DevisPDFGenerator {
 
         const doc = new PDFDocument({
             size: 'A4',
-            margins: { top: 30, bottom: 50, left: 40, right: 40 },
+            margins: { top: 30, bottom: 30, left: 40, right: 40 },
             bufferPages: true
         });
 
@@ -62,7 +62,7 @@ class DevisPDFGenerator {
             const devis = rows[0];
 
             const [rubriques] = await connection.query(
-                'SELECT * FROM LiaisonCotationsRubriques WHERE IDCotation = ?',
+                'SELECT * FROM liaisoncotationsrubriques WHERE IDCotation = ?',
                 [cotationId]
             );
 
