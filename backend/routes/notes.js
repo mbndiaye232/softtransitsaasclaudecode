@@ -729,6 +729,39 @@ router.post('/:id/validate', checkPermission('NOTES', 'can_edit'), async (req, r
     }
 });
 
+// POST /api/notes/:id/unvalidate - Unvalidate a note de détail (re-opens modifications)
+router.post('/:id/unvalidate', checkPermission('NOTES', 'can_edit'), async (req, res) => {
+    try {
+        const noteId = req.params.id;
+
+        let checkQuery = 'SELECT n.IDNotesDeDetails FROM notesdedetails n JOIN dossiers d ON n.IDDossiers = d.IDDossiers WHERE n.IDNotesDeDetails = ?';
+        let checkParams = [noteId];
+        if (!req.user.is_provider) {
+            checkQuery += ' AND d.structur_id = ?';
+            checkParams.push(req.structur_id);
+        }
+        const [exist] = await pool.query(checkQuery, checkParams);
+        if (exist.length === 0) return res.status(404).json({ error: 'Note not found' });
+
+        await pool.query('UPDATE notesdedetails SET Valide = 0 WHERE IDNotesDeDetails = ?', [noteId]);
+
+        await auditService.log({
+            agent_id: req.user.id,
+            structur_id: req.user.structur_id,
+            action: 'UNVALIDATE',
+            resource_type: 'NOTE',
+            resource_id: noteId,
+            ip_address: req.ip,
+            user_agent: req.headers['user-agent']
+        });
+
+        res.json({ message: 'Note de détail dévalidée avec succès', validated: false });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 // GET /api/notes/:id/pdf-status - Check if note has been validated
 router.get('/:id/pdf-status', checkPermission('NOTES', 'can_view'), async (req, res) => {
     try {

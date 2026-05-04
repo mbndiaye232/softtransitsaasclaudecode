@@ -405,6 +405,19 @@ export default function NoteDeDetail() {
         catch(e) { showMessage('Erreur validation','error'); }
     };
 
+    const handleUnvalidateNote = async () => {
+        if (!selectedNote) return;
+        if (!window.confirm('Dévalider cette note ? Les modifications redeviendront possibles.')) return;
+        try { await notesAPI.unvalidate(selectedNote.IDNotesDeDetails); setIsValidated(false); setPdfGenerated(false); showMessage('Note dévalidée','success'); }
+        catch(e) { showMessage('Erreur dévalidation','error'); }
+    };
+
+    const handleToggleValidation = () => {
+        if (isValidated) handleUnvalidateNote();
+        else if (pdfGenerated) handleValidateNote();
+        else showMessage('Générez le PDF avant de valider','error');
+    };
+
     const checkValidationStatus = async (id) => {
         try { setIsValidated((await notesAPI.getPdfStatus(id)).data.validated); } catch { setIsValidated(false); }
     };
@@ -795,12 +808,43 @@ export default function NoteDeDetail() {
                         <div style={{padding:'14px 12px',display:'flex',flexDirection:'column',gap:9}}>
                             <ActionBtn icon={<Database size={14}/>} label="Sauvegarder la Matrice" color={COLORS.matrice.accent} onClick={handleSaveAllArticles} disabled={isValidated}/>
                             <ActionBtn icon={<Download size={14}/>} label={isGeneratingPDF?'Impression…':'Générer Note de Détail (PDF)'} color="#059669" onClick={handleGeneratePDF} disabled={!selectedNote||isGeneratingPDF}/>
-                            {pdfGenerated&&!isValidated&&(
-                                <ActionBtn icon={<ShieldCheck size={14}/>} label="Valider Fermeture Note" color="#d97706" onClick={handleValidateNote}/>
-                            )}
-                            {isValidated&&(
-                                <div style={{padding:'11px',background:'#ecfdf5',border:'1px solid #a7f3d0',borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center',gap:7,fontWeight:800,fontSize:11,color:'#059669'}}>
-                                    <CheckCircle2 size={16}/> DOCUMENT SÉCURISÉ & COLLÉ
+
+                            {/* Toggle validation */}
+                            {selectedNote && (
+                                <div
+                                    onClick={handleToggleValidation}
+                                    style={{
+                                        display:'flex', alignItems:'center', justifyContent:'space-between',
+                                        padding:'10px 12px',
+                                        background: isValidated ? '#ecfdf5' : (!pdfGenerated ? '#f8fafc' : '#fffbeb'),
+                                        border: `1px solid ${isValidated ? '#a7f3d0' : (!pdfGenerated ? '#e5e7eb' : '#fde68a')}`,
+                                        borderRadius:9, cursor: pdfGenerated||isValidated ? 'pointer' : 'not-allowed',
+                                        transition:'all .2s', gap:10,
+                                        opacity: !pdfGenerated && !isValidated ? 0.5 : 1,
+                                    }}
+                                    title={isValidated ? 'Cliquer pour dévalider la note' : (!pdfGenerated ? 'Générez le PDF avant de valider' : 'Cliquer pour valider la note')}
+                                >
+                                    <div style={{display:'flex',alignItems:'center',gap:7}}>
+                                        <ShieldCheck size={14} color={isValidated ? '#059669' : (!pdfGenerated ? '#9ca3af' : '#d97706')}/>
+                                        <span style={{fontSize:11,fontWeight:800,color: isValidated ? '#059669' : (!pdfGenerated ? '#9ca3af' : '#92400e')}}>
+                                            {isValidated ? 'NOTE VALIDÉE' : 'VALIDER LA NOTE'}
+                                        </span>
+                                    </div>
+                                    {/* Switch visuel */}
+                                    <div style={{
+                                        width:36, height:20, borderRadius:10, position:'relative',
+                                        background: isValidated ? '#059669' : '#d1d5db',
+                                        transition:'background .25s', flexShrink:0,
+                                    }}>
+                                        <div style={{
+                                            position:'absolute', top:3,
+                                            left: isValidated ? 18 : 3,
+                                            width:14, height:14, borderRadius:'50%',
+                                            background:'white',
+                                            boxShadow:'0 1px 3px rgba(0,0,0,.3)',
+                                            transition:'left .25s',
+                                        }}/>
+                                    </div>
                                 </div>
                             )}
                             {selectedNote&&(
