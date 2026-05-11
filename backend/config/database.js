@@ -1,5 +1,14 @@
 const mysql = require('mysql2/promise');
+const fs = require('fs');
 require('dotenv').config();
+
+// Support fichier local (dev) ou contenu PEM direct (Render/production)
+let sslConfig = undefined;
+if (process.env.DB_SSL_CA_CONTENT) {
+  sslConfig = { ca: process.env.DB_SSL_CA_CONTENT };
+} else if (process.env.DB_SSL_CA) {
+  sslConfig = { ca: fs.readFileSync(process.env.DB_SSL_CA) };
+}
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
@@ -7,6 +16,7 @@ const pool = mysql.createPool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
+  ssl: sslConfig,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,

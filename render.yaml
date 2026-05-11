@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: soft-transit-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 3001
+      - key: NODE_ENV
+        value: production
+      - key: DB_HOST
+        value: mysql-84d1be7-softtransit.i.aivencloud.com
+      - key: DB_PORT
+        value: 25931
+      - key: DB_USER
+        value: avnadmin
+      - key: DB_NAME
+        value: defaultdb
+      # Valeurs sensibles à renseigner manuellement dans le dashboard Render :
+      # DB_PASSWORD, DB_SSL_CA_CONTENT, JWT_SECRET, SMTP_PASS, DOCUMENT_ENCRYPTION_KEY
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: SMTP_HOST
+        value: SSL0.OVH.NET
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_USER
+        value: softtransit@sst.best
+      - key: FRONTEND_URL
+        value: https://softtransit.net
