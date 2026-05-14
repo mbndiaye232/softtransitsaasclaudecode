@@ -286,48 +286,21 @@ export default function NoteDeDetail() {
         } catch(e) { showMessage('Erreur enregistrement','error'); }
     };
 
-    const handleDistribute = async () => {
+    const handleDistribute = () => {
         const totalFOB = matrixArticles.reduce((s,a) => s + parseFloat(a.FOB||0), 0);
         if (!totalFOB) { showMessage('FOB total = 0','warning'); return; }
-        if (!selectedNote) { showMessage('Sélectionnez une note','warning'); return; }
         const { globalFret, globalAssurance, globalWeight } = globalValues;
-
-        // 1. Mise à jour optimiste de la matrice (affichage immédiat)
-        const distributed = matrixArticles.map(a => {
+        setMatrixArticles(matrixArticles.map(a => {
             const fob = parseFloat(a.FOB||0);
             if (!fob) return a;
             const ratio = fob/totalFOB;
             const u={};
-            if (globalFret>0)      u.Fret=       (ratio*parseFloat(globalFret)).toFixed(0);
+            if (globalFret>0)      u.Fret=      (ratio*parseFloat(globalFret)).toFixed(0);
             if (globalAssurance>0) u.Assurances= (ratio*parseFloat(globalAssurance)).toFixed(0);
             if (globalWeight>0)    u.BRUT=       (ratio*parseFloat(globalWeight)).toFixed(2);
             return { ...a, ...u };
-        });
-        setMatrixArticles(distributed);
-
-        // 2. Persistance : il faut d'abord que tous les articles existent en BD
-        // avec leur FOB à jour, puis on appelle /distribute (recalcule FRET, ASSURANCES,
-        // BRUT côté backend) suivi de /convert-to-fcfa (recalcule FOBCFA, FRETCFA,
-        // ASSURANCESCFA, CAF). Sans cela, les colonnes non sauvegardées gardent
-        // 0 en BD et le PDF affiche un montant d'assurance erroné.
-        try {
-            // Sauvegarder/créer tous les articles avec NTS pour avoir un IDArticles
-            const valid = distributed.filter(a => a.NTS && a.NTS.trim() !== '');
-            for (const a of valid) {
-                if (a.IDArticles) await notesAPI.updateArticle(a.IDArticles, a);
-                else              await notesAPI.addArticle(selectedNote.IDNotesDeDetails, { ...a, IdAgent: user?.id||1 });
-            }
-            // Répartition côté backend (persiste FRET, ASSURANCES, BRUT pour TOUS les articles)
-            await notesAPI.distribute(selectedNote.IDNotesDeDetails, { globalFret, globalAssurance, globalWeight });
-            // Conversion CFA pour toutes les colonnes
-            await notesAPI.convertToFCFA(selectedNote.IDNotesDeDetails);
-            // Recharger depuis la BD pour refléter l'état sauvegardé
-            await loadArticles(selectedNote.IDNotesDeDetails);
-            showMessage('Répartition appliquée et sauvegardée','success');
-        } catch (e) {
-            console.error('distribute error:', e);
-            showMessage('Erreur lors de la sauvegarde de la répartition','error');
-        }
+        }));
+        showMessage('Répartition effectuée','info');
     };
 
     const handleConvertToFCFA = async () => {
