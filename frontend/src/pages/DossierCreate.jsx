@@ -57,11 +57,14 @@ const DossierCreate = () => {
         console.log('Client selected:', client);
         console.log('Client ID:', client.IDCLIENTS);
         setSelectedClient(client);
+        // Préremplir la personne contact du dossier avec celle du client.
+        // Si le client n'a pas de personne contact renseignée, fallback sur les
+        // coordonnées principales du client. Les champs restent éditables.
         setForm(prev => ({
             ...prev,
-            contactName: client.NomClient,
-            contactPhone: client.Tel1 || '',
-            contactEmail: client.Email || ''
+            contactName:  client.PersonneContact      || client.NomClient || '',
+            contactPhone: client.TelPersonneContact   || client.Tel1      || '',
+            contactEmail: client.EmailPersonneContact || client.Email     || ''
         }));
     };
 
