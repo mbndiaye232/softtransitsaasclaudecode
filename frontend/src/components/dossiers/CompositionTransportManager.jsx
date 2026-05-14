@@ -64,7 +64,7 @@ const CompositionTransportManager = ({ dossierId, dossierType }) => {
                     setGroupageForm(prev => ({ ...prev, UnitePoids: defaultPoids }));
                 }
                 if (vol.length > 0) {
-                    const defaultVol = vol[0].libelle || vol[0].LibelleUnitesVolume || 'm³';
+                    const defaultVol = vol[0].libelle || vol[0].LibelleUniteVolume || 'm³';
                     setContainerForm(prev => ({ ...prev, UniteVolume: defaultVol }));
                 }
             })
@@ -358,7 +358,7 @@ const CompositionTransportManager = ({ dossierId, dossierType }) => {
                                                     title="Unité de volume"
                                                 >
                                                     {unitesVolume.length > 0
-                                                        ? unitesVolume.map(u => <option key={u.id || u.IDUnitesVolume} value={u.libelle || u.LibelleUnitesVolume}>{u.libelle || u.LibelleUnitesVolume}</option>)
+                                                        ? unitesVolume.map(u => <option key={u.id || u.IDUniteVolume} value={u.libelle || u.LibelleUniteVolume}>{u.libelle || u.LibelleUniteVolume}</option>)
                                                         : <option value="m³">m³</option>
                                                     }
                                                 </select>
