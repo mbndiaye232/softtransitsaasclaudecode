@@ -459,7 +459,7 @@ router.post('/:id/send-email', checkPermission('FACTURES', 'can_view'), async (r
     try {
         const invoiceId = req.params.id;
         const { compteMailId, emailDestinataire, documentIds = [], message: customMessage, objet: customObjet } = req.body;
-        const axios = require('axios');
+        const { sendMail } = require('../services/mailer');
         const { downloadFromR2 } = require('../utils/r2');
         const { decrypt } = require('../utils/encryption');
 
@@ -554,43 +554,13 @@ router.post('/:id/send-email', checkPermission('FACTURES', 'can_view'), async (r
             }
         }
 
-        // 6. Send — Brevo HTTP API (port 443, jamais bloqué) ou SMTP fallback
-        const BREVO_API_KEY = process.env.BREVO_API_KEY;
-
-        if (BREVO_API_KEY) {
-            // ── Brevo HTTP API ──────────────────────────────────────────────
-            const brevoAttachments = attachmentBuffers.map(a => ({
-                name:    a.filename,
-                content: Buffer.isBuffer(a.content)
-                    ? a.content.toString('base64')
-                    : Buffer.from(a.content).toString('base64'),
-            }));
-
-            await axios.post(
-                'https://api.brevo.com/v3/smtp/email',
-                {
-                    sender:      { email: fromEmail, name: fromName },
-                    to:          [{ email: clientEmail }],
-                    subject,
-                    htmlContent: bodyHtml,
-                    attachment:  brevoAttachments,
-                },
-                {
-                    headers: {
-                        'api-key':      BREVO_API_KEY,
-                        'Content-Type': 'application/json',
-                    },
-                    timeout: 30000,
-                }
-            );
-
-        } else {
-            // ── SMTP fallback (peut être bloqué sur Railway) ─────────────────
-            const nodemailer = require('nodemailer');
-            const SMTP_TIMEOUT = 20000;
-            let smtpConfig;
-
-            if (compteMailId) {
+        // 6. Send via shared mailer (Brevo HTTP API → port 443, non bloqué par Render)
+        //    Fallback SMTP global si BREVO_API_KEY absent ;
+        //    fallback SMTP par tenant si un compteMailId est fourni et que Brevo n'est pas configuré.
+        try {
+            if (!process.env.BREVO_API_KEY && compteMailId) {
+                // Per-tenant SMTP (utilisé seulement si Brevo non configuré et compteMailId fourni)
+                const nodemailer = require('nodemailer');
                 const [[compte]] = await pool.query(
                     'SELECT * FROM comptesmails WHERE IDComptesMails = ? AND structur_id = ?',
                     [compteMailId, req.structur_id]
@@ -602,42 +572,42 @@ router.post('/:id/send-email', checkPermission('FACTURES', 'can_view'), async (r
                 const portSMTP    = parseInt(compte.PortSMTP || compte.portsmtp || 587) || 587;
                 const secureSSL   = !!(compte.SecureSSL || compte.securessl);
                 if (!serveurSMTP) {
-                    return res.status(400).json({ error: 'Aucun serveur SMTP configuré. Ajoutez BREVO_API_KEY dans Railway (gratuit sur brevo.com).' });
+                    return res.status(400).json({ error: 'Aucun serveur SMTP configuré. Ajoutez BREVO_API_KEY dans Render (gratuit sur brevo.com).' });
                 }
-                smtpConfig = { host: serveurSMTP, port: portSMTP, secure: secureSSL, auth: { user: adresseMail, pass: motDePasse } };
+                const transporter = nodemailer.createTransport({
+                    host: serveurSMTP, port: portSMTP, secure: secureSSL,
+                    auth: { user: adresseMail, pass: motDePasse },
+                    tls: { rejectUnauthorized: false },
+                    connectionTimeout: 20000, greetingTimeout: 20000, socketTimeout: 20000,
+                });
+                await transporter.verify();
+                await transporter.sendMail({
+                    from: `"${fromName}" <${fromEmail}>`,
+                    to: clientEmail,
+                    subject,
+                    html: bodyHtml,
+                    attachments: attachmentBuffers,
+                });
             } else {
-                if (!process.env.SMTP_HOST) {
-                    return res.status(400).json({ error: 'Aucun compte mail configuré. Ajoutez BREVO_API_KEY dans Railway ou un compte dans Paramètres → Comptes Mails.' });
-                }
-                smtpConfig = {
-                    host: process.env.SMTP_HOST,
-                    port: parseInt(process.env.SMTP_PORT) || 587,
-                    secure: parseInt(process.env.SMTP_PORT) === 465,
-                    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-                };
-            }
-
-            const transporter = nodemailer.createTransport({
-                ...smtpConfig,
-                tls: { rejectUnauthorized: false },
-                connectionTimeout: SMTP_TIMEOUT,
-                greetingTimeout: SMTP_TIMEOUT,
-                socketTimeout: SMTP_TIMEOUT,
-            });
-
-            try { await transporter.verify(); } catch (smtpErr) {
-                return res.status(400).json({
-                    error: `Connexion SMTP impossible (${smtpErr.message}). Railway bloque les ports SMTP — ajoutez BREVO_API_KEY dans Railway (gratuit sur brevo.com).`
+                // Brevo HTTP API (préféré) ou SMTP global en fallback — géré par le mailer partagé
+                await sendMail({
+                    fromEmail, fromName,
+                    to: clientEmail,
+                    subject,
+                    html: bodyHtml,
+                    attachments: attachmentBuffers,
                 });
             }
-
-            const smtpAttachments = attachmentBuffers.map(a => ({ filename: a.filename, content: a.content }));
-            await transporter.sendMail({
-                from: `"${fromName}" <${fromEmail}>`,
-                to: clientEmail,
-                subject,
-                html: bodyHtml,
-                attachments: smtpAttachments,
+        } catch (sendErr) {
+            const brevoMsg = sendErr?.response?.data?.message;
+            const smtpMsg  = sendErr?.message || '';
+            if (smtpMsg.includes('timeout') || smtpMsg.includes('ETIMEDOUT') || smtpMsg.includes('ECONNREFUSED')) {
+                return res.status(400).json({
+                    error: `Connexion SMTP impossible (${smtpMsg}). Render bloque les ports SMTP sortants — ajoutez BREVO_API_KEY dans les variables d'environnement Render (gratuit sur brevo.com).`,
+                });
+            }
+            return res.status(500).json({
+                error: brevoMsg ? `Erreur Brevo : ${brevoMsg}` : `Erreur d'envoi : ${smtpMsg}`,
             });
         }
 

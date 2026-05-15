@@ -1,12 +1,5 @@
 const pool = require('../config/database');
-const nodemailer = require('nodemailer');
-
-const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: false,
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-});
+const { sendMail } = require('./mailer');
 
 const ALERT_DAYS = [30, 15, 7];
 
@@ -81,8 +74,7 @@ async function sendRenewalAlert(email, company, daysLeft, alertLevel) {
         day: 'numeric', month: 'long', year: 'numeric'
     });
 
-    await transporter.sendMail({
-        from: `"Soft Transit" <${process.env.SMTP_USER}>`,
+    await sendMail({
         to: email,
         subject: `[${urgency}] Votre forfait Soft Transit expire dans ${daysLeft} jours`,
         html: `
