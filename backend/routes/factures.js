@@ -511,6 +511,7 @@ router.post('/:id/send-email', checkPermission('FACTURES', 'can_view'), async (r
 
         // 5. Collect all attachments as Buffers
         const attachmentBuffers = [{ filename: pdfFilename, content: pdfBuffer }];
+        const failedAttachments = []; // [{ name, reason }]
 
         const [justificatifs] = await pool.query(
             'SELECT OriginalName, FilePath FROM liaisonfacturejustificatifs WHERE IDFactures = ?',
@@ -520,6 +521,8 @@ router.post('/:id/send-email', checkPermission('FACTURES', 'can_view'), async (r
             const absPath = path.isAbsolute(j.FilePath) ? j.FilePath : path.join(__dirname, '..', j.FilePath);
             if (fs.existsSync(absPath)) {
                 attachmentBuffers.push({ filename: j.OriginalName, content: fs.readFileSync(absPath) });
+            } else {
+                failedAttachments.push({ name: j.OriginalName, reason: 'fichier introuvable sur le serveur' });
             }
         });
 
@@ -530,10 +533,15 @@ router.post('/:id/send-email', checkPermission('FACTURES', 'can_view'), async (r
                 documentIds
             );
             for (const doc of docs) {
+                const label = doc.LibelleDocument || `document #${doc.IDDocuments}`;
                 try {
                     let encryptedBuffer;
                     const key = doc.CheminDocument;
                     if (key.startsWith('documents/')) {
+                        // Stocké sur Cloudflare R2 — exige CLOUDFLARE_R2_* en env
+                        if (!process.env.CLOUDFLARE_R2_ACCOUNT_ID || !process.env.CLOUDFLARE_R2_ACCESS_KEY_ID) {
+                            throw new Error('R2 non configuré (CLOUDFLARE_R2_* manquant)');
+                        }
                         encryptedBuffer = await downloadFromR2(key);
                     } else {
                         const legacyPaths = [
@@ -542,14 +550,18 @@ router.post('/:id/send-email', checkPermission('FACTURES', 'can_view'), async (r
                             path.join('uploads', key),
                         ];
                         const legacyPath = legacyPaths.find(p => fs.existsSync(p));
-                        if (!legacyPath) continue;
+                        if (!legacyPath) throw new Error('fichier introuvable sur le disque');
                         encryptedBuffer = fs.readFileSync(legacyPath);
                     }
+                    if (!process.env.DOCUMENT_ENCRYPTION_KEY) {
+                        throw new Error('clé de déchiffrement absente (DOCUMENT_ENCRYPTION_KEY manquant)');
+                    }
                     const decryptedBuffer = decrypt(encryptedBuffer);
-                    const filename = (doc.LibelleDocument || 'document') + path.extname(key);
+                    const filename = label + path.extname(key);
                     attachmentBuffers.push({ filename, content: decryptedBuffer });
                 } catch (e) {
-                    console.warn(`Impossible d'attacher le document ${doc.IDDocuments}:`, e.message);
+                    console.warn(`Impossible d'attacher le document ${doc.IDDocuments} (${label}):`, e.message);
+                    failedAttachments.push({ name: label, reason: e.message });
                 }
             }
         }
@@ -613,6 +625,16 @@ router.post('/:id/send-email', checkPermission('FACTURES', 'can_view'), async (r
 
         // 7. Mark as sent
         await pool.query('UPDATE factures SET dateenvoye = NOW() WHERE IDFactures = ?', [invoiceId]);
+
+        // Construit un message clair selon que des pièces jointes ont échoué ou non
+        if (failedAttachments.length > 0) {
+            const list = failedAttachments.map(f => `${f.name} (${f.reason})`).join(' ; ');
+            return res.json({
+                message: `E-mail envoyé à ${clientEmail}, mais ${failedAttachments.length} pièce(s) jointe(s) n'ont pas pu être incluses : ${list}`,
+                warning: true,
+                failedAttachments,
+            });
+        }
         res.json({ message: `E-mail envoyé avec succès à ${clientEmail}` });
 
     } catch (error) {
