@@ -996,24 +996,15 @@ router.post('/request-mode', async (req, res) => {
              requested_mode, requested_forfait_type || null, message || null]
         );
 
-        // Notifier le super admin par email
+        // Notifier le super admin par email (via mailer partagé → Brevo si configuré)
         try {
-            const nodemailer = require('nodemailer');
-            const transporter = nodemailer.createTransport({
-                host: process.env.SMTP_HOST, port: parseInt(process.env.SMTP_PORT || '587'),
-                secure: false, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-            });
-            const [[superAdmin]] = await pool.query(
-                "SELECT Email FROM agents WHERE is_active=1 AND role='ADMIN' LIMIT 1",
-                // on cible le provider via structur.is_provider
-            );
+            const { sendMail } = require('../services/mailer');
             const adminEmails = await pool.query(
                 "SELECT a.Email FROM agents a JOIN structur s ON a.structur_id=s.IDSociete WHERE s.is_provider=1 AND a.role='ADMIN' AND a.is_active=1"
             );
-            const targets = (adminEmails[0] || []).map(r => r.Email).join(',');
-            if (targets) {
-                await transporter.sendMail({
-                    from: `"Soft Transit" <${process.env.SMTP_USER}>`,
+            const targets = (adminEmails[0] || []).map(r => r.Email).filter(Boolean);
+            if (targets.length > 0) {
+                await sendMail({
                     to: targets,
                     subject: `[Demande] Changement de mode facturation — ${req.user.name}`,
                     html: `<p>Nouvelle demande de changement de mode :</p>
@@ -1023,7 +1014,7 @@ router.post('/request-mode', async (req, res) => {
                              <li>Mode demandé : <strong>${requested_mode}${requested_forfait_type ? ' (' + requested_forfait_type + ')' : ''}</strong></li>
                              <li>Message : ${message || '—'}</li>
                            </ul>
-                           <a href="${process.env.FRONTEND_URL}/admin/billing">Traiter la demande →</a>`
+                           <a href="${process.env.FRONTEND_URL}/admin/billing">Traiter la demande →</a>`,
                 });
             }
         } catch (emailErr) {
@@ -1145,20 +1136,15 @@ router.put('/admin/requests/:id', requireSuperAdmin, async (req, res) => {
 
         await connection.commit();
 
-        // Notifier le client par email
+        // Notifier le client par email (via mailer partagé → Brevo si configuré)
         try {
-            const nodemailer = require('nodemailer');
-            const transporter = nodemailer.createTransport({
-                host: process.env.SMTP_HOST, port: parseInt(process.env.SMTP_PORT || '587'),
-                secure: false, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-            });
+            const { sendMail } = require('../services/mailer');
             const [[agent]] = await pool.query(
                 'SELECT Email, NomAgent FROM agents WHERE IDAgents = ?', [request.agent_id]
             );
-            if (agent) {
+            if (agent && agent.Email) {
                 const approved = action === 'approve';
-                await transporter.sendMail({
-                    from: `"Soft Transit" <${process.env.SMTP_USER}>`,
+                await sendMail({
                     to: agent.Email,
                     subject: `Votre demande de changement de mode a été ${approved ? 'approuvée' : 'refusée'}`,
                     html: `<div style="font-family:sans-serif;max-width:560px;margin:auto;">

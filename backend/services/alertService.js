@@ -1,15 +1,5 @@
-const nodemailer = require('nodemailer');
 const pool = require('../config/database');
-
-const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: false,
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-    },
-});
+const { sendMail } = require('./mailer');
 
 /**
  * Vérifie les seuils d'alerte après chaque débit de crédit
@@ -77,8 +67,7 @@ async function sendThresholdAlert(structur_id, email, companyName, level, thresh
     const urgencyLabels = { 1: 'Attention', 2: 'Urgent', 3: 'Critique' };
     const urgency = urgencyLabels[level] || 'Alerte';
 
-    await transporter.sendMail({
-        from: `"Soft Transit" <${process.env.SMTP_USER}>`,
+    await sendMail({
         to: email,
         subject: `[${urgency}] Crédits faibles - ${companyName} (${balance} crédits restants)`,
         html: `
@@ -118,8 +107,7 @@ async function sendThresholdAlert(structur_id, email, companyName, level, thresh
 }
 
 async function sendEmptyAlert(structur_id, email, companyName) {
-    await transporter.sendMail({
-        from: `"Soft Transit" <${process.env.SMTP_USER}>`,
+    await sendMail({
         to: email,
         subject: `[BLOQUÉ] Crédits épuisés - ${companyName}`,
         html: `
@@ -161,8 +149,7 @@ async function logAlertToDb(structur_id, type, balance, threshold) {
  * Envoie une facture PDF par email après un achat réussi
  */
 async function sendPurchaseReceipt(email, companyName, pack, transaction) {
-    await transporter.sendMail({
-        from: `"Soft Transit" <${process.env.SMTP_USER}>`,
+    await sendMail({
         to: email,
         subject: `Confirmation d'achat - ${pack.credits} crédits Soft Transit`,
         html: `
