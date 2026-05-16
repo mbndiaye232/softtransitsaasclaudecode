@@ -109,6 +109,12 @@ export const dossiersAPI = {
     getTaxesLiquidees: (id) => api.get(`/dossiers/${id}/taxes-liquidees`)
 };
 
+export const leadsAPI = {
+    create: (data) => api.post('/leads', data),
+    list:   () => api.get('/leads'),
+    update: (id, data) => api.put(`/leads/${id}`, data),
+};
+
 export const notesAPI = {
     getAll: (dossierId) => api.get(`/notes${dossierId ? `?dossier_id=${dossierId}` : ''}`),
     getOne: (id) => api.get(`/notes/${id}`),

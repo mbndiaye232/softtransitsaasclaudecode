@@ -55,6 +55,7 @@ import ReglementsPage from './pages/ReglementsPage'
 import SuiviFacturesClient from './pages/SuiviFacturesClient'
 import CancellationManager from './pages/CancellationManager'
 import TransportArrivals from './pages/TransportArrivals'
+import Demo from './pages/Demo'
 
 const ProtectedRoute = ({ children }) => {
     const { user, loading } = useAuth()
@@ -78,6 +79,7 @@ function AppRoutes() {
             {/* Public */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/demo" element={<Demo />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 
