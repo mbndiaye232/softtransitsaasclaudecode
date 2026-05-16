@@ -57,22 +57,50 @@ router.post('/', checkPermission('NOTES', 'can_create'), async (req, res) => {
             return res.status(403).json({ error: 'Dossier not found or access denied' });
         }
 
-        // Generate REPERTOIRE if not provided
-        let repertoire = Repertoire;
-        if (!repertoire || repertoire.trim() === '') {
-            const year = new Date().getFullYear();
-            const [countResult] = await pool.query(
-                'SELECT COUNT(*) as count FROM notesdedetails WHERE YEAR(DateCreation) = ?',
-                [year]
+        // Generate REPERTOIRE if not provided.
+        // We use MAX of existing sequence numbers (not COUNT) because COUNT
+        // breaks when notes are deleted or when 2 inserts race. We also retry
+        // on ER_DUP_ENTRY (race condition) up to 5 times.
+        const year = new Date().getFullYear();
+        const computeNextRepertoire = async () => {
+            const [maxRow] = await pool.query(
+                `SELECT REPERTOIRE FROM notesdedetails
+                 WHERE REPERTOIRE LIKE ?
+                 ORDER BY CAST(SUBSTRING_INDEX(REPERTOIRE, '-', -1) AS UNSIGNED) DESC
+                 LIMIT 1`,
+                [`REP-${year}-%`]
             );
-            const sequence = (countResult[0].count + 1).toString().padStart(4, '0');
-            repertoire = `REP-${year}-${sequence}`;
-        }
+            let nextSeq = 1;
+            if (maxRow.length > 0 && maxRow[0].REPERTOIRE) {
+                const lastSeq = parseInt(maxRow[0].REPERTOIRE.split('-').pop(), 10);
+                if (!isNaN(lastSeq)) nextSeq = lastSeq + 1;
+            }
+            return `REP-${year}-${nextSeq.toString().padStart(4, '0')}`;
+        };
 
-        const [result] = await pool.query(
-            'INSERT INTO notesdedetails (IDDossiers, REPERTOIRE, NINEA, CodeProvenance, IdAgent, DateCreation) VALUES (?, ?, ?, ?, ?, NOW())',
-            [IDDossiers, repertoire, NINEA, Provenance, req.user.id]
-        );
+        let repertoire = Repertoire;
+        const autoGenerate = !repertoire || repertoire.trim() === '';
+
+        let result;
+        let attempts = 0;
+        const maxAttempts = 5;
+        while (true) {
+            if (autoGenerate) repertoire = await computeNextRepertoire();
+            try {
+                [result] = await pool.query(
+                    'INSERT INTO notesdedetails (IDDossiers, REPERTOIRE, NINEA, CodeProvenance, IdAgent, DateCreation) VALUES (?, ?, ?, ?, ?, NOW())',
+                    [IDDossiers, repertoire, NINEA, Provenance, req.user.id]
+                );
+                break;
+            } catch (e) {
+                attempts++;
+                if (autoGenerate && e.code === 'ER_DUP_ENTRY' && attempts < maxAttempts) {
+                    // Race: another insert took our number. Recompute and retry.
+                    continue;
+                }
+                throw e;
+            }
+        }
 
         await auditService.log({
             agent_id: req.user.id,
