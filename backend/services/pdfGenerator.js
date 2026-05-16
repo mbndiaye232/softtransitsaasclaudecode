@@ -251,14 +251,15 @@ class NoteDetailPDFGenerator {
         const { note, articles, ordreTransit } = data;
 
         // Calculate totals from articles
-        let totalFOB = 0, totalFret = 0, totalAss = 0, totalColis = 0;
+        let totalFOB = 0, totalFret = 0, totalAssDevise = 0, totalAssCFA = 0, totalColis = 0;
         let totalPoidsBrut = 0, totalPoidsNet = 0;
         let symboleFOB = '', symboleFret = '', symboleAss = '';
 
         articles.forEach((a, i) => {
             totalFOB += parseFloat(a.FOB || 0);
             totalFret += parseFloat(a.FRET || 0);
-            totalAss += parseFloat(a.ASSURANCES || 0); // This might be in Devise or CFA, normally assumed CFA here if from input
+            totalAssDevise += parseFloat(a.ASSURANCES || 0);
+            totalAssCFA += parseFloat(a.ASSURANCESCFA || 0);
             totalColis += parseInt(a.NBCOLIS || 0);
             totalPoidsBrut += parseFloat(a.BRUT || 0);
             totalPoidsNet += parseFloat(a.NET || 0);
@@ -269,9 +270,11 @@ class NoteDetailPDFGenerator {
             }
         });
 
-        // If Assurances in DB is CFA (from articles update), use that. 
-        // But for display "Assurances en UM", usually it's the total CFA.
-        const assuranceCFA = note.MontantAssurancesTotalDevise || totalAss;
+        // The header label "Assurances: X CFA" must show the CFA-converted total,
+        // not the devise total. We prefer the sum of ASSURANCESCFA across articles
+        // (which is what's displayed in the matrix as "Assurances"). Fall back to
+        // MontantAssurancesTotalDevise only if no per-article CFA values exist.
+        const assuranceCFA = totalAssCFA || note.MontantAssurancesTotalDevise || totalAssDevise;
 
         const startY = 135;
         doc.fontSize(9).font('Helvetica');
