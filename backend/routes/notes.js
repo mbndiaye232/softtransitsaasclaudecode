@@ -70,7 +70,7 @@ router.post('/', checkPermission('NOTES', 'can_create'), async (req, res) => {
         }
 
         const [result] = await pool.query(
-            'INSERT INTO notesdedetails (IDDossiers, REPERTOIRE, NINEA, Provenance, IdAgent, DateCreation) VALUES (?, ?, ?, ?, ?, NOW())',
+            'INSERT INTO notesdedetails (IDDossiers, REPERTOIRE, NINEA, CodeProvenance, IdAgent, DateCreation) VALUES (?, ?, ?, ?, ?, NOW())',
             [IDDossiers, repertoire, NINEA, Provenance, req.user.id]
         );
 
