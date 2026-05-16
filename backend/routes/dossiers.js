@@ -395,28 +395,46 @@ router.get('/:id/taxes-liquidees', checkPermission('DOSSIERS', 'can_view'), asyn
         const [dexist] = await pool.query(checkQuery, checkParams);
         if (dexist.length === 0) return res.status(404).json({ error: 'Dossier not found' });
 
-        // Retrieve notes for dossier
-        const [notes] = await pool.query('SELECT IDNotesDeDetails, Valide FROM notesdedetails WHERE IDDossiers = ?', [dossierId]);
+        // Retrieve notes for dossier (exclude soft-deleted)
+        const [notes] = await pool.query(
+            `SELECT IDNotesDeDetails, REPERTOIRE, Valide, DateCreation
+             FROM notesdedetails
+             WHERE IDDossiers = ? AND deleted_at IS NULL
+             ORDER BY DateCreation ASC`,
+            [dossierId]
+        );
         if (notes.length === 0) {
             return res.status(400).json({ error: "Il n'existe pas de note de détail pour ce dossier. Impossible de récupérer les taxes." });
         }
 
-        // Check if all are validated (Valide == 1)
+        // Check if all are validated (Valide == 1).
+        // If any are unvalidated, return 409 with the list so the frontend can
+        // show a modal letting the user validate or delete each one.
         const unvalidated = notes.filter(n => n.Valide !== 1);
         if (unvalidated.length > 0) {
-            return res.status(400).json({ error: "Toutes les notes de détail du dossier ne sont pas validées. Impossible de récupérer les taxes." });
+            return res.status(409).json({
+                error: "Certaines notes de détail ne sont pas validées. Validez-les ou supprimez-les avant de récupérer les taxes.",
+                code: 'UNVALIDATED_NOTES',
+                unvalidated_notes: unvalidated.map(n => ({
+                    id: n.IDNotesDeDetails,
+                    repertoire: n.REPERTOIRE,
+                    date_creation: n.DateCreation
+                }))
+            });
         }
 
-        // Aggregate taxes
+        // Aggregate taxes (excluding soft-deleted notes)
         const [taxes] = await pool.query(`
-            SELECT 
-                la.CodeTaxe, 
-                MAX(la.LibelleTaxe) as LibelleTaxeComplet, 
+            SELECT
+                la.CodeTaxe,
+                MAX(la.LibelleTaxe) as LibelleTaxeComplet,
                 SUM(la.Montant) as la_somme_MontantLiquide
             FROM liquidations_articles la
             JOIN articles a ON la.IDArticles = a.IDArticles
             JOIN notesdedetails n ON a.IDNotesDeDetails = n.IDNotesDeDetails
             WHERE n.IDDossiers = ?
+              AND n.deleted_at IS NULL
+              AND n.Valide = 1
             GROUP BY la.CodeTaxe
             ORDER BY la.CodeTaxe
         `, [dossierId]);
