@@ -19,18 +19,19 @@ router.get('/', checkPermission('NOTES', 'can_view'), async (req, res) => {
             JOIN dossiers d ON n.IDDossiers = d.IDDossiers
             JOIN structur s ON d.structur_id = s.IDSociete
             LEFT JOIN agents a ON n.IdAgent = a.IDAgents
+            WHERE n.deleted_at IS NULL
         `;
         const params = [];
 
         if (!req.is_viewing_all) {
-            query += ' WHERE d.structur_id = ?';
+            query += ' AND d.structur_id = ?';
             params.push(req.structur_id);
             if (dossier_id) {
                 query += ' AND n.IDDossiers = ?';
                 params.push(dossier_id);
             }
         } else if (dossier_id) {
-            query += ' WHERE n.IDDossiers = ?';
+            query += ' AND n.IDDossiers = ?';
             params.push(dossier_id);
         }
 
@@ -124,10 +125,10 @@ router.post('/', checkPermission('NOTES', 'can_create'), async (req, res) => {
 router.get('/:id', checkPermission('NOTES', 'can_view'), async (req, res) => {
     try {
         let query = `
-            SELECT n.* 
+            SELECT n.*
             FROM notesdedetails n
             JOIN dossiers d ON n.IDDossiers = d.IDDossiers
-            WHERE n.IDNotesDeDetails = ?
+            WHERE n.IDNotesDeDetails = ? AND n.deleted_at IS NULL
         `;
         let params = [req.params.id];
 
@@ -154,10 +155,10 @@ router.put('/:id', checkPermission('NOTES', 'can_edit'), async (req, res) => {
 
         // Verify ownership
         let checkQuery = `
-            SELECT n.IDNotesDeDetails, n.Valide 
+            SELECT n.IDNotesDeDetails, n.Valide
             FROM notesdedetails n
             JOIN dossiers d ON n.IDDossiers = d.IDDossiers
-            WHERE n.IDNotesDeDetails = ?
+            WHERE n.IDNotesDeDetails = ? AND n.deleted_at IS NULL
         `;
         let checkParams = [req.params.id];
         if (!req.user.is_provider) {
@@ -196,10 +197,10 @@ router.put('/:id', checkPermission('NOTES', 'can_edit'), async (req, res) => {
 router.delete('/:id', checkPermission('NOTES', 'can_delete'), async (req, res) => {
     try {
         let checkQuery = `
-            SELECT n.IDNotesDeDetails 
+            SELECT n.IDNotesDeDetails
             FROM notesdedetails n
             JOIN dossiers d ON n.IDDossiers = d.IDDossiers
-            WHERE n.IDNotesDeDetails = ?
+            WHERE n.IDNotesDeDetails = ? AND n.deleted_at IS NULL
         `;
         let checkParams = [req.params.id];
         if (!req.user.is_provider) {
@@ -210,7 +211,11 @@ router.delete('/:id', checkPermission('NOTES', 'can_delete'), async (req, res) =
         const [exist] = await pool.query(checkQuery, checkParams);
         if (exist.length === 0) return res.status(404).json({ error: 'Note not found' });
 
-        await pool.query('DELETE FROM notesdedetails WHERE IDNotesDeDetails = ?', [req.params.id]);
+        // Soft delete: set deleted_at instead of physical DELETE
+        await pool.query(
+            'UPDATE notesdedetails SET deleted_at = NOW() WHERE IDNotesDeDetails = ?',
+            [req.params.id]
+        );
 
         await auditService.log({
             agent_id: req.user.id,
@@ -339,7 +344,7 @@ router.post('/:id/convert-to-fcfa', checkPermission('NOTES', 'can_edit'), async 
         await connection.beginTransaction();
 
         // Ownership check
-        let checkQuery = 'SELECT n.IDNotesDeDetails FROM notesdedetails n JOIN dossiers d ON n.IDDossiers = d.IDDossiers WHERE n.IDNotesDeDetails = ?';
+        let checkQuery = 'SELECT n.IDNotesDeDetails FROM notesdedetails n JOIN dossiers d ON n.IDDossiers = d.IDDossiers WHERE n.IDNotesDeDetails = ? AND n.deleted_at IS NULL';
         let checkParams = [noteId];
         if (!req.user.is_provider) {
             checkQuery += ' AND d.structur_id = ?';
@@ -728,7 +733,7 @@ router.post('/:id/validate', checkPermission('NOTES', 'can_edit'), async (req, r
         const noteId = req.params.id;
 
         // Check ownership
-        let checkQuery = 'SELECT n.IDNotesDeDetails FROM notesdedetails n JOIN dossiers d ON n.IDDossiers = d.IDDossiers WHERE n.IDNotesDeDetails = ?';
+        let checkQuery = 'SELECT n.IDNotesDeDetails FROM notesdedetails n JOIN dossiers d ON n.IDDossiers = d.IDDossiers WHERE n.IDNotesDeDetails = ? AND n.deleted_at IS NULL';
         let checkParams = [noteId];
         if (!req.user.is_provider) {
             checkQuery += ' AND d.structur_id = ?';
@@ -762,7 +767,7 @@ router.post('/:id/unvalidate', checkPermission('NOTES', 'can_edit'), async (req,
     try {
         const noteId = req.params.id;
 
-        let checkQuery = 'SELECT n.IDNotesDeDetails FROM notesdedetails n JOIN dossiers d ON n.IDDossiers = d.IDDossiers WHERE n.IDNotesDeDetails = ?';
+        let checkQuery = 'SELECT n.IDNotesDeDetails FROM notesdedetails n JOIN dossiers d ON n.IDDossiers = d.IDDossiers WHERE n.IDNotesDeDetails = ? AND n.deleted_at IS NULL';
         let checkParams = [noteId];
         if (!req.user.is_provider) {
             checkQuery += ' AND d.structur_id = ?';

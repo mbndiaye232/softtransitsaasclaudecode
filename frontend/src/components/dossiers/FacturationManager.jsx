@@ -27,7 +27,7 @@ import {
     Edit, // Added
     AlertCircle // Added
 } from 'lucide-react';
-import { facturesAPI, rubriquesAPI, devisesAPI, dossiersAPI, clientsAPI, facturesRecuesAPI, comptesMailsAPI, documentsAPI } from '../../services/api';
+import { facturesAPI, rubriquesAPI, devisesAPI, dossiersAPI, clientsAPI, facturesRecuesAPI, comptesMailsAPI, documentsAPI, notesAPI } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
 const FacturationManager = ({ dossierId }) => {
@@ -50,6 +50,10 @@ const FacturationManager = ({ dossierId }) => {
 
     // --- EMAIL & JUSTIFICATIFS STATES ---
     const [showEmailModal, setShowEmailModal] = useState(false);
+    // Modal for unvalidated notes during taxes fetch
+    const [unvalidatedNotes, setUnvalidatedNotes] = useState([]);
+    const [showUnvalidatedModal, setShowUnvalidatedModal] = useState(false);
+    const [unvalidatedActionLoading, setUnvalidatedActionLoading] = useState(null);
     const [selectedFacture, setSelectedFacture] = useState(null);
     const [justificatifs, setJustificatifs] = useState([]);
     const [uploading, setUploading] = useState(false);
@@ -230,10 +234,54 @@ const FacturationManager = ({ dossierId }) => {
             }
         } catch (err) {
             console.error('Error fetching taxes:', err);
-            const msg = err.response?.data?.error || err.message;
-            alert(msg);
+            // Backend returns 409 with the list of unvalidated notes -> show modal
+            if (err.response?.status === 409 && err.response?.data?.code === 'UNVALIDATED_NOTES') {
+                setUnvalidatedNotes(err.response.data.unvalidated_notes || []);
+                setShowUnvalidatedModal(true);
+            } else {
+                const msg = err.response?.data?.error || err.message;
+                alert(msg);
+            }
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleValidateUnvalidatedNote = async (noteId) => {
+        try {
+            setUnvalidatedActionLoading(noteId);
+            await notesAPI.validate(noteId);
+            const remaining = unvalidatedNotes.filter(n => n.id !== noteId);
+            setUnvalidatedNotes(remaining);
+            if (remaining.length === 0) {
+                // All resolved -> close modal & retry the taxes fetch
+                setShowUnvalidatedModal(false);
+                await handleFetchNoteDetail();
+            }
+        } catch (err) {
+            alert(err.response?.data?.error || 'Erreur lors de la validation de la note');
+        } finally {
+            setUnvalidatedActionLoading(null);
+        }
+    };
+
+    const handleDeleteUnvalidatedNote = async (noteId, repertoire) => {
+        if (!window.confirm(`Supprimer définitivement la note ${repertoire} ? (suppression logique, les données sont conservées pour audit)`)) {
+            return;
+        }
+        try {
+            setUnvalidatedActionLoading(noteId);
+            await notesAPI.delete(noteId);
+            const remaining = unvalidatedNotes.filter(n => n.id !== noteId);
+            setUnvalidatedNotes(remaining);
+            if (remaining.length === 0) {
+                setShowUnvalidatedModal(false);
+                await handleFetchNoteDetail();
+            }
+        } catch (err) {
+            alert(err.response?.data?.error || 'Erreur lors de la suppression de la note');
+        } finally {
+            setUnvalidatedActionLoading(null);
         }
     };
 
@@ -1182,6 +1230,72 @@ const FacturationManager = ({ dossierId }) => {
                     </div>
                 )
             }
+
+            {showUnvalidatedModal && (
+                <div
+                    style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}
+                    onClick={() => !unvalidatedActionLoading && setShowUnvalidatedModal(false)}
+                >
+                    <div
+                        style={{ background: 'white', borderRadius: 16, width: 'min(560px, 92vw)', maxHeight: '85vh', overflow: 'auto', boxShadow: '0 30px 60px rgba(0,0,0,0.35)' }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <Info size={20} color="#dc2626" />
+                                <h3 style={{ margin: 0, fontSize: 16, color: '#0f172a' }}>Notes de détail non validées</h3>
+                            </div>
+                            <button
+                                onClick={() => setShowUnvalidatedModal(false)}
+                                disabled={!!unvalidatedActionLoading}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: '#64748b', lineHeight: 1 }}
+                            >×</button>
+                        </div>
+                        <div style={{ padding: '14px 20px', fontSize: 13, color: '#475569', background: '#fef2f2', borderBottom: '1px solid #fee2e2' }}>
+                            Pour récupérer la somme des taxes du dossier, chaque note de détail doit être validée. Pour chaque note ci-dessous, choisissez de la <strong>valider</strong> (gel des montants) ou de la <strong>supprimer</strong> (suppression logique).
+                        </div>
+                        <div style={{ padding: '12px 20px' }}>
+                            {unvalidatedNotes.length === 0 ? (
+                                <div style={{ color: '#64748b', fontSize: 13, padding: '12px 0' }}>Aucune note restante.</div>
+                            ) : unvalidatedNotes.map(note => (
+                                <div key={note.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                        <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 14 }}>{note.repertoire || `Note #${note.id}`}</span>
+                                        <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                                            {note.date_creation ? new Date(note.date_creation).toLocaleString('fr-FR') : ''}
+                                        </span>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 8 }}>
+                                        <button
+                                            onClick={() => handleValidateUnvalidatedNote(note.id)}
+                                            disabled={!!unvalidatedActionLoading}
+                                            style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: '#059669', color: 'white', fontSize: 12, fontWeight: 700, cursor: unvalidatedActionLoading ? 'not-allowed' : 'pointer', opacity: unvalidatedActionLoading === note.id ? 0.5 : 1 }}
+                                        >
+                                            {unvalidatedActionLoading === note.id ? '…' : 'Valider'}
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteUnvalidatedNote(note.id, note.repertoire)}
+                                            disabled={!!unvalidatedActionLoading}
+                                            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #fecaca', background: 'white', color: '#dc2626', fontSize: 12, fontWeight: 700, cursor: unvalidatedActionLoading ? 'not-allowed' : 'pointer' }}
+                                        >
+                                            Supprimer
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end' }}>
+                            <button
+                                onClick={() => setShowUnvalidatedModal(false)}
+                                disabled={!!unvalidatedActionLoading}
+                                style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', color: '#475569', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                            >
+                                Fermer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div >
     );
 };
