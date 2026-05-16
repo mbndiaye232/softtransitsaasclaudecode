@@ -253,9 +253,14 @@ export default function NoteDeDetail() {
     const handleCreateNote = async () => {
         if (!selectedDossier) { showMessage('Sélectionnez un dossier','warning'); return; }
         try {
-            await notesAPI.create({ IDDossiers: selectedDossier.id||selectedDossier.IDDossiers, Repertoire:'', NINEA: selectedClient?.NINEA||'', Provenance:'', IdAgent: user?.id||1 });
-            showMessage('Note créée','success');
-            loadNotes(selectedDossier.id||selectedDossier.IDDossiers);
+            const res = await notesAPI.create({ IDDossiers: selectedDossier.id||selectedDossier.IDDossiers, Repertoire:'', NINEA: selectedClient?.NINEA||'', Provenance:'', IdAgent: user?.id||1 });
+            showMessage('Note créée — vous pouvez saisir les articles','success');
+            const dossierId = selectedDossier.id || selectedDossier.IDDossiers;
+            const updated = (await notesAPI.getAll(dossierId)).data;
+            setNotes(updated);
+            // Auto-sélectionner la note fraîchement créée et réinitialiser la matrice
+            const newNote = updated.find(n => n.IDNotesDeDetails === res.data.id);
+            if (newNote) { setSelectedNote(newNote); resetMatrix(); }
         } catch(e) { showMessage('Erreur création note','error'); }
     };
 
