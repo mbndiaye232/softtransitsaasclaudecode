@@ -86,6 +86,7 @@ const unitesPoidRoutes = require('./routes/unitesPoids');
 const unitesVolumeRoutes = require('./routes/unitesVolume');
 const backupsRoutes = require('./routes/backups');
 const suiviTraitementsRoutes = require('./routes/suivi-traitements');
+const leadsRoutes = require('./routes/leads');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/structures', structuresRoutes);
@@ -97,6 +98,7 @@ app.use('/api/groupes', groupesRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/dossiers', dossiersRoutes);
 app.use('/api/notes', notesRoutes);
+app.use('/api/leads', leadsRoutes);
 app.use('/api/produits', produitsRoutes);
 app.use('/api/regimes', regimesRoutes);
 app.use('/api/devises', devisesRoutes);
