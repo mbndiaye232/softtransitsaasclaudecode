@@ -16,16 +16,14 @@ async function checkForfaitRenewals() {
                s.Emailstructur as email, s.credit_alert_email,
                s.forfait_expires_at,
                DATEDIFF(s.forfait_expires_at, NOW()) as days_left,
-               a.Email as admin_email, a.NomAgent as admin_name
+               (SELECT a.Email    FROM agents a WHERE a.structur_id = s.IDSociete AND a.role = 'ADMIN' AND a.is_active = 1 LIMIT 1) as admin_email,
+               (SELECT a.NomAgent FROM agents a WHERE a.structur_id = s.IDSociete AND a.role = 'ADMIN' AND a.is_active = 1 LIMIT 1) as admin_name
              FROM structur s
-             LEFT JOIN agents a ON a.structur_id = s.IDSociete
-               AND a.role = 'ADMIN' AND a.is_active = 1
              WHERE s.billing_mode = 'forfait'
                AND s.forfait_type = 'annuel'
                AND s.forfait_expires_at IS NOT NULL
                AND s.forfait_expires_at > NOW()
-               AND DATEDIFF(s.forfait_expires_at, NOW()) <= 30
-             GROUP BY s.IDSociete`
+               AND DATEDIFF(s.forfait_expires_at, NOW()) <= 30`
         );
 
         for (const company of expiring) {
