@@ -6,6 +6,7 @@ const { body, validationResult } = require('express-validator');
 const { authMiddleware, tenantMiddleware, checkPermission } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const auditService = require('../services/auditService');
+const { recomputeAllDossiersEtape } = require('../services/etapeService');
 
 // Apply middleware to all routes
 router.use(authMiddleware);
@@ -443,6 +444,27 @@ router.get('/:id/taxes-liquidees', checkPermission('DOSSIERS', 'can_view'), asyn
     } catch (err) {
         console.error('Error fetching taxes for dossier:', err);
         res.status(500).json({ error: 'Failed to fetch liquidations' });
+    }
+});
+
+/**
+ * POST /api/dossiers/recompute-etapes (SUPER_ADMIN only)
+ * Backfill : recalcule l'étape de tous les dossiers (ou d'une structure).
+ * À lancer une fois après le déploiement de la feature.
+ *   - Sans body : toutes les structures
+ *   - Body { structur_id: N } : limiter à une structure
+ */
+router.post('/recompute-etapes', async (req, res) => {
+    try {
+        if (req.user.role !== 'SUPER_ADMIN') {
+            return res.status(403).json({ error: 'SUPER_ADMIN only' });
+        }
+        const structurId = req.body?.structur_id || null;
+        const result = await recomputeAllDossiersEtape({ structurId });
+        res.json(result);
+    } catch (err) {
+        console.error('Recompute étapes error:', err);
+        res.status(500).json({ error: err.message });
     }
 });
 

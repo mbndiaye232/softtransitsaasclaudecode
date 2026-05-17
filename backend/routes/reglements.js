@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../config/database');
 const { authMiddleware, checkPermission } = require('../middleware/auth');
 const auditService = require('../services/auditService');
+const { recomputeAndSaveDossierEtape } = require('../services/etapeService');
 
 router.use(authMiddleware);
 
@@ -191,6 +192,22 @@ router.post('/', checkPermission('FACTURES', 'can_edit'), async (req, res) => {
         });
 
         await connection.commit();
+
+        // Recompute étape on every affected dossier (best-effort, after commit)
+        try {
+            const [touchedDossiers] = await pool.query(
+                `SELECT DISTINCT f.IDDossiers
+                 FROM factures f
+                 WHERE f.IDFactures IN (${listFactures.map(() => '?').join(',')})`,
+                listFactures
+            );
+            for (const d of touchedDossiers) {
+                if (d.IDDossiers) recomputeAndSaveDossierEtape(d.IDDossiers);
+            }
+        } catch (e) {
+            console.error('[reglements] recompute étape failed:', e.message);
+        }
+
         res.json({ message: 'Règlement traité avec succès', remainingAmount });
 
     } catch (error) {
@@ -291,6 +308,15 @@ router.delete('/:id', checkPermission('FACTURES', 'can_edit'), async (req, res) 
         });
 
         await connection.commit();
+
+        // Recompute étape du dossier impacté
+        try {
+            const [[fac]] = await pool.query('SELECT IDDossiers FROM factures WHERE IDFactures = ?', [payment.IDFactures]);
+            if (fac?.IDDossiers) recomputeAndSaveDossierEtape(fac.IDDossiers);
+        } catch (e) {
+            console.error('[reglements] recompute étape after cancel failed:', e.message);
+        }
+
         res.json({ message: 'Règlement annulé avec succès' });
 
     } catch (error) {
