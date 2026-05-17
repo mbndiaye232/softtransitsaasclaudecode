@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { leadsAPI } from '../services/api';
+import WhatsAppButton from '../components/WhatsAppButton';
 import {
     Calculator, Clock, FileCheck, Layers, ShieldCheck, Zap,
     CheckCircle2, AlertTriangle, Mail, Phone, Globe2, ArrowRight
@@ -265,6 +266,8 @@ export default function Demo() {
                     © {new Date().getFullYear()} Soft Services Technologies — Tous droits réservés
                 </div>
             </footer>
+
+            <WhatsAppButton />
         </div>
     );
 }
