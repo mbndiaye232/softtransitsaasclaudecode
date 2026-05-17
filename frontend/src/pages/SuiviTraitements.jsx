@@ -193,7 +193,7 @@ export default function SuiviTraitements() {
                                 Suivi des traitements
                             </h1>
                             <p style={{ margin: 0, color: 'rgba(255,255,255,0.75)', fontSize: '0.83rem' }}>
-                                Dossiers maritimes en cours — urgence calculée sur 10 jours ouvrables
+                                Dossiers en cours (tous modes) — urgence calculée sur 10 jours ouvrables
                             </p>
                         </div>
                     </div>
@@ -341,10 +341,10 @@ export default function SuiviTraitements() {
                                 <Ship size={32} color="#0369a1" style={{ opacity: 0.5 }} />
                             </div>
                             <p style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#475569' }}>
-                                Aucun dossier maritime en cours à afficher.
+                                Aucun dossier en cours à afficher.
                             </p>
                             <p style={{ margin: '0.5rem 0 0', fontSize: '0.85rem', color: '#94a3b8' }}>
-                                Tous les dossiers maritimes sont soit facturés, soit sans date d'arrivée.
+                                Tous les dossiers sont soit facturés, soit sans date de référence.
                             </p>
                         </div>
                     )}
