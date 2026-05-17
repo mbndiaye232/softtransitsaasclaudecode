@@ -56,6 +56,7 @@ import SuiviFacturesClient from './pages/SuiviFacturesClient'
 import CancellationManager from './pages/CancellationManager'
 import TransportArrivals from './pages/TransportArrivals'
 import Demo from './pages/Demo'
+import AdminLeads from './pages/AdminLeads'
 
 const ProtectedRoute = ({ children }) => {
     const { user, loading } = useAuth()
@@ -89,6 +90,7 @@ function AppRoutes() {
             <Route path="/billing/payment/success" element={<ProtectedWithBilling><BillingPurchase /></ProtectedWithBilling>} />
             <Route path="/billing/payment/cancel" element={<ProtectedWithBilling><BillingPurchase /></ProtectedWithBilling>} />
             <Route path="/admin/billing" element={<ProtectedWithBilling><AdminBilling /></ProtectedWithBilling>} />
+            <Route path="/admin/leads" element={<ProtectedWithBilling><AdminLeads /></ProtectedWithBilling>} />
 
             {/* Ancienne route crédits → redirect */}
             <Route path="/credits/buy" element={<Navigate to="/billing/purchase" />} />
