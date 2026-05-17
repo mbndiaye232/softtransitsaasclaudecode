@@ -153,6 +153,71 @@ const DecisionDashboard = () => {
     const formatCurrency = (val) =>
         new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF', maximumFractionDigits: 0 }).format(val);
 
+    /* ── Export rapport CSV ──
+       Produit un fichier .csv multi-sections ouvrable par Excel / LibreOffice.
+       BOM UTF-8 + séparateur ';' pour compatibilité Excel français. */
+    const handleExportReport = () => {
+        const esc = (v) => {
+            if (v === null || v === undefined) return '';
+            const s = String(v).replace(/"/g, '""');
+            return /[";\n]/.test(s) ? `"${s}"` : s;
+        };
+        const row = (...cells) => cells.map(esc).join(';');
+        const blank = '';
+        const today = new Date();
+        const dateStr = today.toLocaleDateString('fr-FR');
+        const fileDate = today.toISOString().slice(0, 10);
+
+        const lines = [];
+        lines.push(row('Tableau de Bord Directionnel - Soft Transit'));
+        lines.push(row('Date d\'export', dateStr));
+        lines.push(blank);
+
+        lines.push(row('=== INDICATEURS CLES ==='));
+        lines.push(row('Indicateur', 'Valeur (FCFA)'));
+        lines.push(row('Chiffre d\'Affaires (H.T)', Math.round(totalCA)));
+        lines.push(row('Total Encours Client', Math.round(totalEncours)));
+        lines.push(row('Flux Financiers (12 mois)', Math.round(totalFlux)));
+        lines.push(row('Ouvertures Dossiers (12 mois)', totalDoss));
+        lines.push(blank);
+
+        lines.push(row('=== TOP 10 CLIENTS PAR CHIFFRE D\'AFFAIRES ==='));
+        lines.push(row('Client', 'Montant CA (FCFA)'));
+        topClients.forEach(c => lines.push(row(c.name, Math.round(parseFloat(c.value || 0)))));
+        lines.push(blank);
+
+        lines.push(row('=== TOP 10 CLIENTS PAR ENCOURS ==='));
+        lines.push(row('Client', 'Encours (FCFA)'));
+        topEncours.forEach(c => lines.push(row(c.name, Math.round(parseFloat(c.value || 0)))));
+        lines.push(blank);
+
+        lines.push(row('=== BALANCE AGEE (factures non reglees) ==='));
+        lines.push(row('Tranche', 'Montant (FCFA)'));
+        agingBalance.forEach(a => lines.push(row(a.period, Math.round(parseFloat(a.amount || 0)))));
+        lines.push(blank);
+
+        lines.push(row('=== EVOLUTION CA vs REGLEMENTS (12 mois) ==='));
+        lines.push(row('Mois', 'CA facture (FCFA)', 'Reglements (FCFA)'));
+        performanceTrends.forEach(p => lines.push(row(p.month, Math.round(p.ca || 0), Math.round(p.pay || 0))));
+        lines.push(blank);
+
+        lines.push(row('=== EVOLUTION OUVERTURES DOSSIERS (12 mois) ==='));
+        lines.push(row('Mois', 'Nombre de dossiers'));
+        dossierTrends.forEach(d => lines.push(row(d.month, d.count || 0)));
+
+        // BOM UTF-8 pour qu Excel affiche correctement les accents
+        const csv = '﻿' + lines.join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href = url;
+        a.download = `soft-transit-rapport-${fileDate}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
     const totalCA      = topClients.reduce((a, c) => a + parseFloat(c.value || 0), 0);
     const totalEncours = topEncours.reduce((a, c) => a + parseFloat(c.value || 0), 0);
     const totalFlux    = performanceTrends.reduce((a, c) => a + (c.pay || 0), 0);
@@ -209,12 +274,12 @@ const DecisionDashboard = () => {
                             <RefreshCw size={15} style={{ animation: spinning ? 'spin 1s linear infinite' : 'none' }} />
                             Actualiser
                         </button>
-                        <button style={{
+                        <button onClick={handleExportReport} disabled={loading} style={{
                             display: 'flex', alignItems: 'center', gap: '0.45rem',
                             background: 'white', border: 'none', borderRadius: '0.6rem',
                             padding: '0.55rem 1.1rem', color: '#0f172a',
-                            cursor: 'pointer', fontSize: '0.85rem', fontWeight: 700,
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                            cursor: loading ? 'not-allowed' : 'pointer', fontSize: '0.85rem', fontWeight: 700,
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)', opacity: loading ? 0.6 : 1
                         }}>
                             <Download size={15} />
                             Exporter Rapport
