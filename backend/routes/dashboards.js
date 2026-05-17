@@ -318,10 +318,15 @@ router.get('/performance-trends', checkPermission('FINANCES', 'can_view'), async
  */
 router.get('/dossier-trends', checkPermission('DOSSIERS', 'can_view'), async (req, res) => {
     try {
+        // Use COALESCE(SaisiLe, created_at) so dossiers with a NULL SaisiLe
+        // (legacy data or partial creation) still appear in the trend chart.
+        // The 12-month window is anchored on whichever date is available.
         let query = `
-            SELECT DATE_FORMAT(SaisiLe, '%Y-%m') as month, COUNT(*) as count
+            SELECT
+                DATE_FORMAT(COALESCE(SaisiLe, created_at, NOW()), '%Y-%m') as month,
+                COUNT(*) as count
             FROM dossiers
-            WHERE SaisiLe >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+            WHERE COALESCE(SaisiLe, created_at, NOW()) >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
               AND (Facturable IS NULL OR Facturable != -1)
         `;
         let params = [];
@@ -330,12 +335,79 @@ router.get('/dossier-trends', checkPermission('DOSSIERS', 'can_view'), async (re
             params.push(req.structur_id);
         }
         query += ' GROUP BY month ORDER BY month ASC';
-        
+
         const [rows] = await pool.query(query, params);
         res.json(rows);
     } catch (err) {
         console.error('Error fetching dossier trends:', err);
+        // If `created_at` column does not exist on `dossiers`, retry without it
+        if (err && err.code === 'ER_BAD_FIELD_ERROR') {
+            try {
+                let fallback = `
+                    SELECT
+                        DATE_FORMAT(COALESCE(SaisiLe, NOW()), '%Y-%m') as month,
+                        COUNT(*) as count
+                    FROM dossiers
+                    WHERE (SaisiLe IS NULL OR SaisiLe >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH))
+                      AND (Facturable IS NULL OR Facturable != -1)
+                `;
+                let params = [];
+                if (!req.is_viewing_all) {
+                    fallback += ' AND structur_id = ?';
+                    params.push(req.structur_id);
+                }
+                fallback += ' GROUP BY month ORDER BY month ASC';
+                const [rows2] = await pool.query(fallback, params);
+                return res.json(rows2);
+            } catch (e2) {
+                console.error('Fallback dossier-trends also failed:', e2);
+            }
+        }
         res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * GET /api/dashboards/_diag
+ * Quick diagnostic endpoint for SUPER_ADMIN to understand why dashboards
+ * return zero. Returns count buckets without filters so we can compare.
+ */
+router.get('/_diag', async (req, res) => {
+    try {
+        if (req.user.role !== 'SUPER_ADMIN') {
+            return res.status(403).json({ error: 'SUPER_ADMIN only' });
+        }
+        const [[total]] = await pool.query('SELECT COUNT(*) as n FROM dossiers');
+        const [[live]]  = await pool.query(
+            'SELECT COUNT(*) as n FROM dossiers WHERE (Facturable IS NULL OR Facturable != -1)'
+        );
+        const [[withSaisiLe]] = await pool.query(
+            'SELECT COUNT(*) as n FROM dossiers WHERE SaisiLe IS NOT NULL'
+        );
+        const [[last12mSaisile]] = await pool.query(
+            `SELECT COUNT(*) as n FROM dossiers
+             WHERE SaisiLe >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)`
+        );
+        const [[validatedFactures]] = await pool.query(
+            'SELECT COUNT(*) as n FROM factures WHERE Validee = 1'
+        );
+        const [sample] = await pool.query(
+            `SELECT IDDossiers, CodeDossier, SaisiLe, Facturable, structur_id
+             FROM dossiers ORDER BY IDDossiers DESC LIMIT 5`
+        );
+        res.json({
+            dossiers_total: total.n,
+            dossiers_non_supprimes: live.n,
+            dossiers_avec_SaisiLe: withSaisiLe.n,
+            dossiers_SaisiLe_dans_12_mois: last12mSaisile.n,
+            factures_validees: validatedFactures.n,
+            user_is_viewing_all: req.is_viewing_all === true,
+            user_structur_id: req.structur_id,
+            sample_dossiers: sample
+        });
+    } catch (err) {
+        console.error('Diag error:', err);
+        res.status(500).json({ error: err.message });
     }
 });
 
