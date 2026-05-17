@@ -62,7 +62,10 @@ function countWorkingDays(from, to) {
  */
 router.get('/', checkPermission('DOSSIERS', 'can_view'), async (req, res) => {
     try {
-        // Maritime dossiers with auto-computed stage
+        // Maritime dossiers with auto-computed stage.
+        // LEFT JOIN transports so a maritime dossier whose BL is not yet
+        // saved (or whose DateArriveePrevue is not filled in) still appears.
+        // When dateArrivee is null we fall back to SaisiLe in the JS below.
         let query = `
             SELECT
                 d.IDDossiers,
@@ -72,9 +75,9 @@ router.get('/', checkPermission('DOSSIERS', 'can_view'), async (req, res) => {
                 d.ModeExpedition   AS mode,
                 d.SaisiLe          AS dateOuverture,
                 cl.NomRS           AS clientName,
-                t.DateArriveePrevue AS dateArrivee,
-                t.NumeroTitreTransport AS blNumber,
-                t.libelleTransport  AS vessel,
+                MAX(t.DateArriveePrevue)     AS dateArrivee,
+                MAX(t.NumeroTitreTransport)  AS blNumber,
+                MAX(t.libelleTransport)      AS vessel,
                 CASE
                     WHEN COUNT(f.IDFactures) > 0                   THEN 5
                     WHEN COUNT(ml.IDMiseEnLivraison) > 0
@@ -85,12 +88,11 @@ router.get('/', checkPermission('DOSSIERS', 'can_view'), async (req, res) => {
                 END AS computed_stage
             FROM dossiers d
             JOIN clients   cl   ON cl.IDCLIENTS         = d.IDCLIENTS
-            JOIN transports t   ON t.idbl                = d.IDDossiers
+            LEFT JOIN transports t        ON t.idbl          = d.IDDossiers
             LEFT JOIN declarations   decl ON decl.IDDossiers = d.IDDossiers
             LEFT JOIN miseenlivraison ml  ON ml.IDDossiers  = d.IDDossiers
             LEFT JOIN factures        f   ON f.IDDossiers   = d.IDDossiers AND f.Validee = 1
             WHERE d.ModeExpedition = 'MA'
-              AND t.DateArriveePrevue IS NOT NULL
               AND (d.Facturable IS NULL OR d.Facturable != -1)
         `;
 
@@ -100,7 +102,7 @@ router.get('/', checkPermission('DOSSIERS', 'can_view'), async (req, res) => {
             params.push(req.structur_id);
         }
 
-        query += ' GROUP BY d.IDDossiers, t.IDTransports';
+        query += ' GROUP BY d.IDDossiers';
 
         const [dossiers] = await pool.query(query, params);
 
@@ -120,9 +122,14 @@ router.get('/', checkPermission('DOSSIERS', 'can_view'), async (req, res) => {
             // Exclude Facturé
             if (d.computed_stage === 5) continue;
 
-            if (!d.dateArrivee) continue;
+            // Reference date for urgency:
+            // - prefer the BL arrival date (DateArriveePrevue)
+            // - fall back to the dossier opening date (SaisiLe) so that
+            //   maritime dossiers without a BL still appear and get an urgency
+            const refDateRaw = d.dateArrivee || d.dateOuverture;
+            if (!refDateRaw) continue;
 
-            const arrival = new Date(d.dateArrivee);
+            const arrival = new Date(refDateRaw);
             arrival.setHours(0, 0, 0, 0);
 
             // Working days elapsed since arrival (0 if arrival is in the future)
