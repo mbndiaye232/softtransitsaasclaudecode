@@ -238,12 +238,15 @@ router.get('/top-encours', checkPermission('FINANCES', 'can_view'), async (req, 
  */
 router.get('/aging-balance', checkPermission('FINANCES', 'can_view'), async (req, res) => {
     try {
+        // Use inline CASE in GROUP BY (not the alias) for compatibility with
+        // MySQL only_full_group_by mode on Render. Also treat NULL DateEcheance
+        // as 0 days so factures without an echeance still show up in 0-30j.
         let query = `
-            SELECT 
-                CASE 
-                    WHEN DATEDIFF(CURDATE(), f.DateEcheance) <= 30 THEN '0-30j'
-                    WHEN DATEDIFF(CURDATE(), f.DateEcheance) <= 90 THEN '31-90j'
-                    WHEN DATEDIFF(CURDATE(), f.DateEcheance) <= 120 THEN '91-120j'
+            SELECT
+                CASE
+                    WHEN DATEDIFF(CURDATE(), COALESCE(f.DateEcheance, CURDATE())) <= 30 THEN '0-30j'
+                    WHEN DATEDIFF(CURDATE(), COALESCE(f.DateEcheance, CURDATE())) <= 90 THEN '31-90j'
+                    WHEN DATEDIFF(CURDATE(), COALESCE(f.DateEcheance, CURDATE())) <= 120 THEN '91-120j'
                     ELSE '+120j'
                 END as period,
                 SUM(f.ReliquatFacture) as amount
@@ -255,13 +258,22 @@ router.get('/aging-balance', checkPermission('FINANCES', 'can_view'), async (req
             query += ' AND f.structur_id = ?';
             params.push(req.structur_id);
         }
-        query += ' GROUP BY period ORDER BY FIELD(period, "0-30j", "31-90j", "91-120j", "+120j")';
-        
+        query += `
+            GROUP BY
+                CASE
+                    WHEN DATEDIFF(CURDATE(), COALESCE(f.DateEcheance, CURDATE())) <= 30 THEN '0-30j'
+                    WHEN DATEDIFF(CURDATE(), COALESCE(f.DateEcheance, CURDATE())) <= 90 THEN '31-90j'
+                    WHEN DATEDIFF(CURDATE(), COALESCE(f.DateEcheance, CURDATE())) <= 120 THEN '91-120j'
+                    ELSE '+120j'
+                END
+            ORDER BY FIELD(period, '0-30j', '31-90j', '91-120j', '+120j')
+        `;
+
         const [rows] = await pool.query(query, params);
         res.json(rows);
     } catch (err) {
-        console.error('Error fetching aging balance:', err);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('Error fetching aging balance:', err && err.message ? err.message : err);
+        res.status(500).json({ error: 'Internal server error', detail: err && err.message });
     }
 });
 
