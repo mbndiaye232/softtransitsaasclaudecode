@@ -127,21 +127,23 @@ const DecisionDashboard = () => {
 
     const fetchAllData = async () => {
         setLoading(true); setSpinning(true);
+        // Promise.allSettled so that if one endpoint errors (e.g. aging-balance
+        // 500), the others still populate the dashboard.
+        const settle = (p) => p.then(r => ({ ok: true, data: r.data }))
+                              .catch(e => { console.error('Dashboard endpoint failed:', e); return { ok: false, data: [] }; });
         try {
             const [clientsRes, encoursRes, agingRes, perfRes, dossierRes] = await Promise.all([
-                dashboardsAPI.getTopClientsCA(),
-                dashboardsAPI.getTopEncours(),
-                dashboardsAPI.getAgingBalance(),
-                dashboardsAPI.getPerformanceTrends(),
-                dashboardsAPI.getDossierTrends()
+                settle(dashboardsAPI.getTopClientsCA()),
+                settle(dashboardsAPI.getTopEncours()),
+                settle(dashboardsAPI.getAgingBalance()),
+                settle(dashboardsAPI.getPerformanceTrends()),
+                settle(dashboardsAPI.getDossierTrends()),
             ]);
-            setTopClients(clientsRes.data);
-            setTopEncours(encoursRes.data);
-            setAgingBalance(agingRes.data);
-            setPerformanceTrends(perfRes.data);
-            setDossierTrends(dossierRes.data);
-        } catch (err) {
-            console.error('Error fetching dashboard data:', err);
+            setTopClients(clientsRes.data || []);
+            setTopEncours(encoursRes.data || []);
+            setAgingBalance(agingRes.data || []);
+            setPerformanceTrends(perfRes.data || []);
+            setDossierTrends(dossierRes.data || []);
         } finally {
             setLoading(false);
             setTimeout(() => setSpinning(false), 700);
