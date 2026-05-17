@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../config/database');
 const { authMiddleware, tenantMiddleware, checkPermission } = require('../middleware/auth');
 const DeliveryNotePDFGenerator = require('../services/DeliveryNotePDFGenerator');
+const { recomputeAndSaveDossierEtape } = require('../services/etapeService');
 
 // Apply middleware
 router.use(authMiddleware);
@@ -71,6 +72,7 @@ router.post('/', checkPermission('DOSSIERS', 'can_edit'), async (req, res) => {
                     IDDossiers
                 ]
             );
+            recomputeAndSaveDossierEtape(IDDossiers);
             res.json({ message: 'Mise en livraison updated' });
         } else {
             // Insert
@@ -96,6 +98,7 @@ router.post('/', checkPermission('DOSSIERS', 'can_edit'), async (req, res) => {
                     Pregate || ''
                 ]
             );
+            recomputeAndSaveDossierEtape(IDDossiers);
             res.status(201).json({ message: 'Mise en livraison created' });
         }
     } catch (err) {

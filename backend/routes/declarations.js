@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const { authMiddleware, tenantMiddleware, checkPermission } = require('../middleware/auth');
+const { recomputeAndSaveDossierEtape } = require('../services/etapeService');
 
 // Apply middleware
 router.use(authMiddleware);
@@ -83,6 +84,8 @@ router.post('/', checkPermission('DOSSIERS', 'can_edit'), async (req, res) => {
                 Observations || ''
             ]
         );
+        // Recompute dossier étape (best-effort)
+        recomputeAndSaveDossierEtape(IDDossiers);
         res.status(201).json({ id: result.insertId, message: 'Declaration created' });
     } catch (err) {
         console.error('Create declaration error:', err);
@@ -95,7 +98,10 @@ router.post('/', checkPermission('DOSSIERS', 'can_edit'), async (req, res) => {
  */
 router.delete('/:id', checkPermission('DOSSIERS', 'can_delete'), async (req, res) => {
     try {
+        // Récupérer IDDossiers avant suppression pour recompute étape
+        const [[row]] = await pool.query('SELECT IDDossiers FROM declarations WHERE IDDeclarations = ?', [req.params.id]);
         await pool.query('DELETE FROM declarations WHERE IDDeclarations = ?', [req.params.id]);
+        if (row?.IDDossiers) recomputeAndSaveDossierEtape(row.IDDossiers);
         res.json({ message: 'Declaration deleted' });
     } catch (err) {
         console.error('Delete declaration error:', err);

@@ -6,6 +6,7 @@ const pool = require('../config/database');
 const { authMiddleware, tenantMiddleware, checkPermission } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const emailService = require('../services/EmailService');
+const { recomputeAndSaveDossierEtape } = require('../services/etapeService');
 
 // Apply middleware to all routes
 router.use(authMiddleware);
@@ -261,6 +262,10 @@ router.patch('/:id/validate', checkPermission('FACTURES', 'can_edit'), async (re
             return res.status(404).json({ error: 'Facture introuvable' });
         }
 
+        // Recompute dossier étape (validation -> Facturé / Partiellement Payé / Clôturé)
+        const [[fac]] = await pool.query('SELECT IDDossiers FROM factures WHERE IDFactures = ?', [req.params.id]);
+        if (fac?.IDDossiers) recomputeAndSaveDossierEtape(fac.IDDossiers);
+
         res.json({ message: 'Facture validée avec succès' });
     } catch (error) {
         console.error('Error validating invoice:', error);
@@ -291,6 +296,9 @@ router.patch('/:id/unvalidate', checkPermission('FACTURES', 'can_edit'), async (
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'Facture introuvable' });
         }
+
+        const [[fac]] = await pool.query('SELECT IDDossiers FROM factures WHERE IDFactures = ?', [req.params.id]);
+        if (fac?.IDDossiers) recomputeAndSaveDossierEtape(fac.IDDossiers);
 
         res.json({ message: 'Facture dévalidée avec succès' });
     } catch (error) {
