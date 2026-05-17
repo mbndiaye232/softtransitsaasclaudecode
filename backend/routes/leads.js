@@ -11,7 +11,7 @@ const pool = require('../config/database');
 const { sendMail } = require('../services/mailer');
 const { authMiddleware } = require('../middleware/auth');
 
-const SALES_INBOX = process.env.SALES_INBOX_EMAIL || 'commercial@softtransit.net';
+const SALES_INBOX = process.env.SALES_INBOX_EMAIL || 'sst@sst.best';
 
 // Very simple email regex (frontend already validates more strictly)
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -98,10 +98,10 @@ router.post('/', async (req, res) => {
             <div style="font-family:Arial,sans-serif;line-height:1.6;color:#0f172a;max-width:600px">
               <h2 style="color:#7c3aed">Bonjour ${escapeHtml(full_name)},</h2>
               <p>Merci d'avoir demandé une démo de <strong>Soft Transit</strong>.</p>
-              <p>Notre équipe vous contactera dans les <strong>24 heures</strong> sur WhatsApp (${escapeHtml(whatsapp)}) pour planifier votre démo gratuite de 15 minutes.</p>
+              <p>Notre équipe vous contactera dans les <strong>24 heures</strong> sur WhatsApp (${escapeHtml(whatsapp)}) pour planifier votre démo gratuite de 30 minutes.</p>
               <p>Pendant la démo, nous vous montrerons :</p>
               <ul>
-                <li>Comment liquider une note de détail en 90 secondes</li>
+                <li>Comment liquider une note de détail en 3 minutes</li>
                 <li>Le calcul automatique de toutes les taxes UEMOA / CEDEAO / COSEC</li>
                 <li>La facturation client auto-remplie depuis les notes validées</li>
               </ul>

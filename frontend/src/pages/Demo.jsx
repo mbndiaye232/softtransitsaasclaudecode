@@ -7,9 +7,10 @@ import {
     CheckCircle2, AlertTriangle, Mail, Phone, Globe2, ArrowRight
 } from 'lucide-react';
 
-const PURPLE = '#7c3aed';
-const PURPLE_DARK = '#5b21b6';
-const PURPLE_LIGHT = '#faf5ff';
+// Bleu de la marque SST (logo Soft Services Technologies)
+const PURPLE = '#1d4ed8';        // bleu principal
+const PURPLE_DARK = '#1e3a8a';   // bleu marine
+const PURPLE_LIGHT = '#eff6ff';  // bleu très clair (fonds)
 
 const COUNTRIES = [
     'Sénégal', 'Mali', 'Côte d\'Ivoire', 'Burkina Faso', 'Bénin', 'Togo',
@@ -28,7 +29,7 @@ const VOLUMES = [
 const FEATURES = [
     {
         icon: <Clock size={28} />,
-        title: '90 secondes par note',
+        title: '3 minutes par note',
         text: 'Saisissez la matrice, lancez la liquidation. Toutes les taxes apparaissent calculées au franc près.'
     },
     {
@@ -67,7 +68,7 @@ const PAINS = [
 const FAQ = [
     {
         q: 'Combien ça coûte ?',
-        a: 'Forfait annuel à partir de 50 000 FCFA/mois ou paiement à l\'usage par crédits. Le tarif exact dépend de votre volume — discutons-en en démo.'
+        a: 'Nous contacter pour obtenir un devis personnalisé adapté à votre volume et à vos besoins.'
     },
     {
         q: 'Mes données sont-elles sécurisées ?',
@@ -79,11 +80,11 @@ const FAQ = [
     },
     {
         q: 'Comment se passe la formation ?',
-        a: '1h de visio en français (ou wolof) + support écrit + chat WhatsApp prioritaire pendant 30 jours après mise en service.'
+        a: 'En présentiel ou en ligne pour 30 heures, suivie d\'une assistance gratuite en ligne pendant 2 mois.'
     },
     {
         q: 'Quels pays sont supportés ?',
-        a: 'Aujourd\'hui : tous les pays UEMOA et CEMAC. Les tarifs douaniers, taxes et codes pays sont préconfigurés.'
+        a: 'CEDEAO, CEMAC, RDC et Mauritanie sont pris en charge nativement. Pour tout autre pays : il suffit de nous fournir le TEC (Tarif Extérieur Commun) et nous l\'intégrons.'
     },
 ];
 
@@ -128,17 +129,17 @@ export default function Demo() {
             {/* Hero */}
             <section style={{ padding: '64px 24px 48px', background: `linear-gradient(180deg, ${PURPLE_LIGHT} 0%, white 100%)`, textAlign: 'center' }}>
                 <div style={{ display: 'inline-block', background: '#fef3c7', color: '#92400e', padding: '6px 14px', borderRadius: 999, fontSize: 12, fontWeight: 700, marginBottom: 20 }}>
-                    🎁 3 mois offerts pour les 10 premières inscriptions
+                    🎁 5 % de réduction pour les 10 premières inscriptions
                 </div>
                 <h1 style={{ fontSize: 'clamp(32px, 5vw, 56px)', fontWeight: 800, lineHeight: 1.1, margin: '0 0 16px', letterSpacing: '-0.03em' }}>
                     Liquidez vos notes de détail<br />
-                    <span style={{ color: PURPLE }}>en 90 secondes.</span>
+                    <span style={{ color: PURPLE }}>en 3 minutes.</span>
                 </h1>
                 <p style={{ fontSize: 18, color: '#475569', maxWidth: 640, margin: '0 auto 32px' }}>
-                    Sans calculatrice. Sans Excel. Sans erreur. Conçu pour les transitaires d'Afrique de l'Ouest et CEMAC.
+                    Sans calculatrice. Sans Excel. Sans erreur. Conçu pour les transitaires d'Afrique de l'Ouest, CEMAC et de tout autre pays.
                 </p>
                 <a href="#form" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: PURPLE, color: 'white', padding: '14px 28px', borderRadius: 12, fontWeight: 700, fontSize: 16, textDecoration: 'none', boxShadow: `0 10px 30px ${PURPLE}40` }}>
-                    📅 Réserver une démo gratuite (15 min) <ArrowRight size={18} />
+                    📅 Réserver une démo gratuite (30 min) <ArrowRight size={18} />
                 </a>
                 <div style={{ marginTop: 14, fontSize: 13, color: '#94a3b8' }}>
                     Sans carte bancaire · Réponse sous 24h
@@ -203,7 +204,7 @@ export default function Demo() {
                         <form onSubmit={handleSubmit} style={{ background: 'white', borderRadius: 16, padding: '32px', boxShadow: '0 20px 50px rgba(0,0,0,0.08)' }}>
                             <h2 style={{ fontSize: 24, fontWeight: 800, margin: '0 0 8px', textAlign: 'center' }}>Réservez votre démo</h2>
                             <p style={{ color: '#64748b', fontSize: 14, textAlign: 'center', margin: '0 0 28px' }}>
-                                15 minutes en français ou wolof. Gratuit.
+                                30 minutes en français ou wolof. Gratuit.
                             </p>
 
                             <Field label="Nom complet *" required value={form.full_name} onChange={handleChange('full_name')} />
@@ -234,7 +235,7 @@ export default function Demo() {
 
                             <div style={{ marginTop: 18, fontSize: 12, color: '#94a3b8', textAlign: 'center', lineHeight: 1.6 }}>
                                 ✓ Pas de carte bancaire requise<br />
-                                ✓ 3 mois offerts pour les 10 premiers<br />
+                                ✓ 5 % de réduction pour les 10 premiers<br />
                                 ✓ Réponse sous 24h
                             </div>
                         </form>
@@ -260,7 +261,7 @@ export default function Demo() {
                 <div style={{ fontWeight: 800, fontSize: 18, color: 'white', marginBottom: 12 }}>Soft Transit</div>
                 <div style={{ display: 'flex', justifyContent: 'center', gap: 24, flexWrap: 'wrap', fontSize: 14, marginBottom: 16 }}>
                     <a href="https://softtransit.net" style={{ color: '#cbd5e1', textDecoration: 'none' }}><Globe2 size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />softtransit.net</a>
-                    <a href="mailto:commercial@softtransit.net" style={{ color: '#cbd5e1', textDecoration: 'none' }}><Mail size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />commercial@softtransit.net</a>
+                    <a href="mailto:sst@sst.best" style={{ color: '#cbd5e1', textDecoration: 'none' }}><Mail size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />sst@sst.best</a>
                 </div>
                 <div style={{ fontSize: 12, color: '#64748b' }}>
                     © {new Date().getFullYear()} Soft Services Technologies — Tous droits réservés
