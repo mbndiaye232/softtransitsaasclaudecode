@@ -395,12 +395,39 @@ router.get('/_diag', async (req, res) => {
             `SELECT IDDossiers, CodeDossier, SaisiLe, Facturable, structur_id
              FROM dossiers ORDER BY IDDossiers DESC LIMIT 5`
         );
+        // Deep dive on factures
+        const [[sumCA]] = await pool.query(
+            'SELECT COALESCE(SUM(MontantHTFacture), 0) as s FROM factures WHERE Validee = 1'
+        );
+        const [[sumRel]] = await pool.query(
+            'SELECT COALESCE(SUM(ReliquatFacture), 0) as s FROM factures WHERE Validee = 1 AND ReliquatFacture > 0'
+        );
+        const [sampleFactures] = await pool.query(
+            `SELECT IDFactures, IDDossiers, structur_id, Validee,
+                    MontantHTFacture, ReliquatFacture, DateEcheance
+             FROM factures WHERE Validee = 1 ORDER BY IDFactures DESC LIMIT 5`
+        );
+        // Test the exact top-clients-ca query to see what it returns
+        const [topClientsTest] = await pool.query(
+            `SELECT
+                ANY_VALUE(cl.NomRS) as name,
+                SUM(f.MontantHTFacture) as value
+             FROM factures f
+             JOIN dossiers d ON f.IDDossiers = d.IDDossiers
+             JOIN clients cl ON d.IDCLIENTS = cl.IDCLIENTS
+             WHERE f.Validee = 1
+             GROUP BY cl.IDCLIENTS ORDER BY value DESC LIMIT 10`
+        );
         res.json({
             dossiers_total: total.n,
             dossiers_non_supprimes: live.n,
             dossiers_avec_SaisiLe: withSaisiLe.n,
             dossiers_SaisiLe_dans_12_mois: last12mSaisile.n,
             factures_validees: validatedFactures.n,
+            factures_validees_SUM_MontantHT: sumCA.s,
+            factures_validees_SUM_Reliquat: sumRel.s,
+            sample_factures_validees: sampleFactures,
+            top_clients_ca_test: topClientsTest,
             user_is_viewing_all: req.is_viewing_all === true,
             user_structur_id: req.structur_id,
             sample_dossiers: sample
