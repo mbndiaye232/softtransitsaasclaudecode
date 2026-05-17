@@ -47,14 +47,21 @@ function countWorkingDays(from, to) {
 
 /**
  * GET /api/suivi-traitements
- * Returns maritime dossiers ordered by urgency (lowest score = most critical).
- * Excludes dossiers at stage Facturé (5).
- * Excludes dossiers without an arrival date.
- * If arrival date is in the future, elapsed = 0 (dossier not yet started).
+ * Returns ALL in-progress dossiers (Maritime / Aérien / Terrestre) ordered by
+ * urgency (lowest score = most critical).
+ *
+ * Excludes dossiers at stage Facturé (5) and soft-deleted dossiers.
+ *
+ * Reference date for urgency calculation:
+ *   1) transports.DateArriveePrevue (if exists — maritime/aerial with transport)
+ *   2) dossiers.SaisiLe             (fallback — non-maritime or no transport row)
+ *
+ * If the reference date is in the future, elapsed = 0 (dossier not yet started).
  */
 router.get('/', checkPermission('DOSSIERS', 'can_view'), async (req, res) => {
     try {
-        // Fetch maritime dossiers with auto-computed stage
+        // LEFT JOIN transports so non-maritime dossiers (no transport row) still appear.
+        // No filter on ModeExpedition: all modes are tracked.
         let query = `
             SELECT
                 d.IDDossiers,
@@ -64,9 +71,9 @@ router.get('/', checkPermission('DOSSIERS', 'can_view'), async (req, res) => {
                 d.ModeExpedition   AS mode,
                 d.SaisiLe          AS dateOuverture,
                 cl.NomRS           AS clientName,
-                t.DateArriveePrevue AS dateArrivee,
-                t.NumeroTitreTransport AS blNumber,
-                t.libelleTransport  AS vessel,
+                MAX(t.DateArriveePrevue)     AS dateArrivee,
+                MAX(t.NumeroTitreTransport)  AS blNumber,
+                MAX(t.libelleTransport)      AS vessel,
                 CASE
                     WHEN COUNT(f.IDFactures) > 0                   THEN 5
                     WHEN COUNT(ml.IDMiseEnLivraison) > 0
@@ -77,12 +84,11 @@ router.get('/', checkPermission('DOSSIERS', 'can_view'), async (req, res) => {
                 END AS computed_stage
             FROM dossiers d
             JOIN clients   cl   ON cl.IDCLIENTS         = d.IDCLIENTS
-            JOIN transports t   ON t.idbl                = d.IDDossiers
+            LEFT JOIN transports t        ON t.idbl          = d.IDDossiers
             LEFT JOIN declarations   decl ON decl.IDDossiers = d.IDDossiers
             LEFT JOIN miseenlivraison ml  ON ml.IDDossiers  = d.IDDossiers
             LEFT JOIN factures        f   ON f.IDDossiers   = d.IDDossiers AND f.Validee = 1
-            WHERE d.ModeExpedition = 'MA'
-              AND t.DateArriveePrevue IS NOT NULL
+            WHERE (d.Facturable IS NULL OR d.Facturable != -1)
         `;
 
         const params = [];
@@ -91,7 +97,7 @@ router.get('/', checkPermission('DOSSIERS', 'can_view'), async (req, res) => {
             params.push(req.structur_id);
         }
 
-        query += ' GROUP BY d.IDDossiers, t.IDTransports';
+        query += ' GROUP BY d.IDDossiers';
 
         const [dossiers] = await pool.query(query, params);
 
@@ -111,9 +117,12 @@ router.get('/', checkPermission('DOSSIERS', 'can_view'), async (req, res) => {
             // Exclude Facturé
             if (d.computed_stage === 5) continue;
 
-            if (!d.dateArrivee) continue;
+            // Use arrival date if available (maritime/aerial), otherwise fall
+            // back to dossier opening date (SaisiLe). Skip if neither exists.
+            const refDateRaw = d.dateArrivee || d.dateOuverture;
+            if (!refDateRaw) continue;
 
-            const arrival = new Date(d.dateArrivee);
+            const arrival = new Date(refDateRaw);
             arrival.setHours(0, 0, 0, 0);
 
             // Working days elapsed since arrival (0 if arrival is in the future)
