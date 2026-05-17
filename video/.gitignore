@@ -1,0 +1,10 @@
+node_modules/
+out/
+.remotion/
+*.log
+
+# Captures copiees depuis ../screenshots/ - on ne les commit pas, copy-assets.bat les regenere
+public/*.png
+public/*.jpg
+# Sauf le logo qui est specifique au projet video
+!public/logo-sst.png
